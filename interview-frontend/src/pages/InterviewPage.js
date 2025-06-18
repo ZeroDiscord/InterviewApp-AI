@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as apiClient from '../services/apiClient';
 import AudioRecorder from '../components/AudioRecorder';
+import { Box, Typography, Paper, Button, CircularProgress } from '@mui/material';
 
 const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
     const [sessionData, setSessionData] = useState(null);
@@ -18,13 +19,10 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
     
     const handleNextQuestion = useCallback(async () => {
         if (!sessionData) return;
-
-        // Clear localStorage for the completed question
         const oldQuestion = sessionData.questions[currentQuestionIndex];
         if(oldQuestion) {
             localStorage.removeItem(`timerEndTime-${sessionData._id}-${oldQuestion._id}`);
         }
-
         if (currentQuestionIndex + 1 >= sessionData.questions.length) {
             setIsSubmitting(true);
             try {
@@ -44,12 +42,10 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
 
     const handleAnswerSubmit = useCallback(async (dataToSubmit) => {
         if (isSubmitting) return;
-        
         setIsSubmitting(true);
         setError('');
         try {
             const currentQuestion = sessionData.questions[currentQuestionIndex];
-            // Get the most up-to-date timeLeft from state for duration calculation
             const duration = currentQuestion.timeLimitSeconds - timeLeft;
             const responseData = {
                 questionId: currentQuestion._id,
@@ -77,25 +73,19 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
     
     const currentQuestion = sessionData?.questions[currentQuestionIndex];
 
-    // --- FIX: Implement localStorage Timer ---
     useEffect(() => {
         if (!currentQuestion) return;
-
         const timerKey = `timerEndTime-${sessionData._id}-${currentQuestion._id}`;
         let endTime = localStorage.getItem(timerKey);
-
         if (!endTime) {
-            // If no end time is stored, this is the first time. Set it now.
             endTime = Date.now() + currentQuestion.timeLimitSeconds * 1000;
             localStorage.setItem(timerKey, endTime);
         }
-
         const updateTimer = () => {
             const remaining = Math.round((endTime - Date.now()) / 1000);
             if (remaining <= 0) {
                 setTimeLeft(0);
                 clearInterval(timerRef.current);
-                // Trigger auto-submit directly if timer hits zero
                 if (!isSubmitting) {
                     setAutoSubmitMessage("Auto-Submitting | Time limit Exhausted");
                     handleAnswerSubmit({ transcription: "[Time Expired]", audioFileUrl: "N/A" });
@@ -104,20 +94,14 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                 setTimeLeft(remaining);
             }
         };
-
-        // Clear any existing timer before starting a new one
         if (timerRef.current) {
             clearInterval(timerRef.current);
         }
-        
         timerRef.current = setInterval(updateTimer, 1000);
-        updateTimer(); // Call immediately to set the initial time correctly
-
+        updateTimer();
         return () => clearInterval(timerRef.current);
     }, [currentQuestion, sessionData, handleAnswerSubmit, isSubmitting]);
 
-
-    // --- Media and Session Fetching ---
     useEffect(() => {
         const fetchSession = async () => {
             if (!uniqueLink) {
@@ -154,7 +138,6 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                 mediaStream.getTracks().forEach(track => track.stop());
             }
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -163,59 +146,93 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
         }
     }, [mediaStream]);
     
-    if (isLoading) return <div className="text-center p-12">Loading Interview...</div>;
-    if (error) return <div className="text-center p-12 bg-red-100 text-red-700">{error}</div>;
-    if (!sessionData || !currentQuestion) return <div className="text-center p-12">Could not load question data.</div>;
-    
+    if (isLoading) return <Box sx={{ textAlign: 'center', p: 12, color: '#bdbdbd', fontFamily: 'Inter, Roboto, Arial, sans-serif' }}><CircularProgress sx={{ color: '#FFE066' }} /></Box>;
+    if (error) return <Box sx={{ textAlign: 'center', p: 12, background: '#2d1a1a', color: '#ff5252', borderRadius: 2, fontFamily: 'Inter, Roboto, Arial, sans-serif' }}>{error}</Box>;
+    if (!sessionData || !currentQuestion) return <Box sx={{ textAlign: 'center', p: 12, color: '#bdbdbd', fontFamily: 'Inter, Roboto, Arial, sans-serif' }}>Could not load question data.</Box>;
+
     const formatTime = (seconds) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
 
     return (
-        <div className="min-h-screen bg-gray-100 flex flex-col items-center p-4 md:p-6">
-            <div className="w-full max-w-5xl">
-                <div className="text-center mb-6"><h1 className="text-3xl font-bold text-gray-800">{sessionData.template.title}</h1></div>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 space-y-6">
-                        <div className="w-full p-6 bg-white rounded-lg shadow-lg">
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-semibold text-gray-700">Question {currentQuestionIndex + 1} of {sessionData.questions.length}</h2>
-                                <div className="text-lg font-bold text-red-500">Time Left: {formatTime(timeLeft)}</div>
-                            </div>
-                            <p className="text-xl text-gray-900 leading-relaxed">{currentQuestion.questionText}</p>
-                        </div>
-                        <div className="w-full p-6 bg-white rounded-lg shadow-lg">
-                           {isSubmitting ? (
-                                <div className="text-center text-gray-700 font-semibold p-4">
-                                    <p>{autoSubmitMessage || "Submitting your answer..."}</p>
-                                </div>
-                           ) : submissionData ? (
-                                <div className="text-center">
-                                    <div className="mb-4 p-4 bg-gray-100 border rounded-md text-left">
-                                        <p className="text-gray-600 font-medium">Your transcribed answer (read-only):</p>
-                                        <p className="text-gray-800 italic">"{submissionData.transcription}"</p>
-                                    </div>
-                                    <button
+        <Box
+            sx={{
+                minHeight: '100vh',
+                background: 'radial-gradient(ellipse at top left, #232526 60%, #181818 100%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                py: 6,
+                fontFamily: 'Inter, Roboto, Arial, sans-serif',
+            }}
+        >
+            <Box sx={{ width: '100%', maxWidth: 1100 }}>
+                <Box sx={{ textAlign: 'center', mb: 6 }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#fff', fontFamily: 'inherit', letterSpacing: 0.5 }}>{sessionData.template.title}</Typography>
+                </Box>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' }, gap: 6 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <Paper elevation={3} sx={{ width: '100%', p: 4, background: '#232526', borderRadius: 2, boxShadow: '0 4px 24px 0 #0002', fontFamily: 'inherit' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: '#FFE066', fontFamily: 'inherit' }}>Question {currentQuestionIndex + 1} of {sessionData.questions.length}</Typography>
+                                <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: '#ff5252', fontFamily: 'inherit' }}>Time Left: {formatTime(timeLeft)}</Typography>
+                            </Box>
+                            <Typography sx={{ fontSize: '1.15rem', color: '#fff', fontFamily: 'inherit', lineHeight: 1.7 }}>{currentQuestion.questionText}</Typography>
+                        </Paper>
+                        <Paper elevation={3} sx={{ width: '100%', p: 4, background: '#232526', borderRadius: 2, boxShadow: '0 4px 24px 0 #0002', fontFamily: 'inherit' }}>
+                            {isSubmitting ? (
+                                <Box sx={{ textAlign: 'center', color: '#bdbdbd', fontWeight: 600, p: 4, fontFamily: 'inherit' }}>
+                                    <Typography>{autoSubmitMessage || "Submitting your answer..."}</Typography>
+                                </Box>
+                            ) : submissionData ? (
+                                <Box sx={{ textAlign: 'center' }}>
+                                    <Box sx={{ mb: 4, p: 3, background: '#181818', border: '1px solid #232526', borderRadius: 2, textAlign: 'left', fontFamily: 'inherit' }}>
+                                        <Typography sx={{ color: '#bdbdbd', fontWeight: 600, fontFamily: 'inherit' }}>Your transcribed answer (read-only):</Typography>
+                                        <Typography sx={{ color: '#fff', fontStyle: 'italic', fontFamily: 'inherit' }}>
+                                            "{submissionData.transcription}"
+                                        </Typography>
+                                    </Box>
+                                    <Button
                                         onClick={() => handleAnswerSubmit(submissionData)}
-                                        className="px-8 py-3 bg-green-600 text-white font-bold rounded-full shadow-lg hover:bg-green-700"
+                                        variant="outlined"
+                                        sx={{
+                                            color: '#FFE066',
+                                            borderColor: '#FFE066',
+                                            borderWidth: 2,
+                                            borderRadius: 1.5,
+                                            py: 1.5,
+                                            px: 6,
+                                            minWidth: '220px',
+                                            fontSize: '1.1rem',
+                                            fontWeight: 700,
+                                            fontFamily: 'inherit',
+                                            boxShadow: 'none',
+                                            transition: 'all 0.2s',
+                                            '&:hover': {
+                                                backgroundColor: '#FFE066',
+                                                color: '#181818',
+                                                borderColor: '#FFE066',
+                                                boxShadow: '0 0 16px 0 #ffe06644',
+                                            },
+                                        }}
                                     >
                                         Submit & Continue
-                                    </button>
-                                </div>
-                           ) : (
-                               <AudioRecorder onTranscriptionComplete={handleTranscriptionComplete} stream={mediaStream} />
-                           )}
-                        </div>
-                    </div>
-                    <div className="space-y-6">
-                        <div className="p-4 bg-white rounded-lg shadow-lg">
-                            <h3 className="font-semibold text-center mb-2">Self-View</h3>
-                            <div className="bg-black rounded-md overflow-hidden aspect-video">
-                                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover"></video>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                                    </Button>
+                                </Box>
+                            ) : (
+                                <AudioRecorder onTranscriptionComplete={handleTranscriptionComplete} stream={mediaStream} />
+                            )}
+                        </Paper>
+                    </Box>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <Paper elevation={3} sx={{ p: 3, background: '#232526', borderRadius: 2, boxShadow: '0 4px 24px 0 #0002', fontFamily: 'inherit' }}>
+                            <Typography sx={{ fontWeight: 700, textAlign: 'center', mb: 2, color: '#bdbdbd', fontFamily: 'inherit' }}>Self-View</Typography>
+                            <Box sx={{ background: '#000', borderRadius: 2, overflow: 'hidden', aspectRatio: '16/9', width: '100%' }}>
+                                <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }}></video>
+                            </Box>
+                        </Paper>
+                    </Box>
+                </Box>
+            </Box>
+        </Box>
     );
 };
 

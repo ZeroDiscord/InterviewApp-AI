@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
     Box,
-    Container,
     TextField,
     Button,
     Typography,
@@ -13,24 +12,30 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 
-const LoginPage = ({ onLoginSuccess }) => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+const LoginPage = ({ onLoginSuccess, onSwitchToRegister }) => {
+    const [form, setForm] = useState({
+        email: '',
+        password: '',
+    });
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
+
+    const handleChange = (e) => {
+        setForm({ ...form, [e.target.name]: e.target.value });
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
-        if (!email || !password) {
+        if (!form.email || !form.password) {
             setError('Please enter both email and password.');
             setIsLoading(false);
             return;
         }
         try {
-            await onLoginSuccess({ email, password });
+            await onLoginSuccess(form);
         } catch (err) {
             setError(err.message || 'Failed to log in. Please check your credentials.');
         } finally {
@@ -38,117 +43,139 @@ const LoginPage = ({ onLoginSuccess }) => {
         }
     };
 
-    const handleClickShowPassword = () => {
-        setShowPassword(!showPassword);
-    };
-
     return (
-        <Container component="main" maxWidth="xs">
-            <Box
+        <Box
+            sx={{
+                minHeight: '100vh',
+                background: 'radial-gradient(ellipse at top left, #232526 60%, #181818 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                py: 4,
+            }}
+        >
+            <Paper
+                elevation={3}
                 sx={{
-                    marginTop: 8,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
+                    p: { xs: 2, sm: 5 },
+                    maxWidth: 600,
+                    width: '100%',
+                    mx: 2,
+                    background: 'rgba(24, 24, 24, 0.98)',
+                    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+                    color: '#fff',
+                    borderRadius: 3,
                 }}
             >
-                <Paper
-                    elevation={3}
-                    sx={{
-                        padding: 4,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        width: '100%',
-                    }}
-                >
-                    <Typography component="h1" variant="h4" sx={{ mb: 3, color: 'primary.main' }}>
-                        AI Interview Portal
+                <Box sx={{ mb: 4, textAlign: 'center' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
+                        Sign In
                     </Typography>
-                    <Typography component="h2" variant="h6" sx={{ mb: 3, color: 'text.secondary' }}>
-                        Sign in to your account
+                    <Typography variant="subtitle1" sx={{ color: '#bdbdbd', fontWeight: 400 }}>
+                        Enter your email and password to sign in
                     </Typography>
+                </Box>
 
-                    {error && (
-                        <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
-                            {error}
-                        </Alert>
-                    )}
+                {error && (
+                    <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
+                        {error}
+                    </Alert>
+                )}
 
-                    <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
+                <form onSubmit={handleSubmit}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {/* Email */}
                         <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            id="email"
-                            label="Email Address"
                             name="email"
-                            autoComplete="email"
-                            autoFocus
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            disabled={isLoading}
-                            sx={{ mb: 2 }}
-                        />
-                        <TextField
-                            margin="normal"
-                            required
+                            placeholder="Write email here"
                             fullWidth
-                            name="password"
-                            label="Password"
-                            type={showPassword ? 'text' : 'password'}
-                            id="password"
-                            autoComplete="current-password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            disabled={isLoading}
+                            required
+                            type="email"
+                            value={form.email}
+                            onChange={handleChange}
+                            variant="filled"
                             InputProps={{
+                                disableUnderline: true,
+                                sx: { bgcolor: '#232526', borderRadius: 1 },
+                            }}
+                            sx={{ input: { color: '#fff', px: 2, py: 1.5 } }}
+                            disabled={isLoading}
+                        />
+
+                        {/* Password */}
+                        <TextField
+                            name="password"
+                            placeholder="Password"
+                            type={showPassword ? 'text' : 'password'}
+                            fullWidth
+                            required
+                            value={form.password}
+                            onChange={handleChange}
+                            variant="filled"
+                            InputProps={{
+                                disableUnderline: true,
+                                sx: { bgcolor: '#232526', borderRadius: 1 },
                                 endAdornment: (
                                     <InputAdornment position="end">
                                         <IconButton
-                                            aria-label="toggle password visibility"
-                                            onClick={handleClickShowPassword}
+                                            onClick={() => setShowPassword(!showPassword)}
                                             edge="end"
+                                            sx={{ color: '#fff' }}
+                                            disabled={isLoading}
                                         >
                                             {showPassword ? <VisibilityOff /> : <Visibility />}
                                         </IconButton>
                                     </InputAdornment>
                                 ),
                             }}
+                            sx={{ input: { color: '#fff', px: 2, py: 1.5 } }}
+                            disabled={isLoading}
                         />
 
-                        <Button
-                            type="submit"
-                            fullWidth
-                            variant="contained"
-                            size="large"
-                            disabled={isLoading}
-                            sx={{
-                                mt: 3,
-                                mb: 2,
-                                py: 1.5,
-                                position: 'relative',
-                            }}
-                        >
-                            {isLoading ? (
-                                <CircularProgress
-                                    size={24}
-                                    sx={{
-                                        position: 'absolute',
-                                        top: '50%',
-                                        left: '50%',
-                                        marginTop: '-12px',
-                                        marginLeft: '-12px',
-                                    }}
-                                />
-                            ) : (
-                                'Sign In'
-                            )}
-                        </Button>
+                        {/* Submit Button */}
+                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                            <Button
+                                type="submit"
+                                variant="outlined"
+                                sx={{
+                                    color: '#FFE066',
+                                    borderColor: '#FFE066',
+                                    borderWidth: 2,
+                                    borderRadius: 1,
+                                    py: 1.5,
+                                    px: 4,
+                                    minWidth: '120px',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 700,
+                                    position: 'relative',
+                                    '&:hover': {
+                                        backgroundColor: '#FFE066',
+                                        color: '#181818',
+                                    },
+                                }}
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <CircularProgress
+                                        size={24}
+                                        sx={{
+                                            color: '#FFE066',
+                                            position: 'absolute',
+                                            top: '50%',
+                                            left: '50%',
+                                            marginTop: '-12px',
+                                            marginLeft: '-12px',
+                                        }}
+                                    />
+                                ) : (
+                                    'SIGN IN'
+                                )}
+                            </Button>
+                        </Box>
                     </Box>
-                </Paper>
-            </Box>
-        </Container>
+                </form>
+            </Paper>
+        </Box>
     );
 };
 

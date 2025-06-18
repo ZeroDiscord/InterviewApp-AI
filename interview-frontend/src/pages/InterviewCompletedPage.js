@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle } from '@mui/icons-material';
-import { Box, Typography, LinearProgress } from '@mui/material';
+import { Box, Typography, LinearProgress, Paper } from '@mui/material';
 
 /**
  * A "Thank You" page shown to candidates after they complete an interview.
@@ -34,28 +34,60 @@ const InterviewCompletedPage = ({ onRedirect }) => {
     return (
         <Box
             sx={{
+                minHeight: '100vh',
+                background: 'radial-gradient(ellipse at top left, #232526 60%, #181818 100%)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                textAlign: 'center',
-                minHeight: '60vh',
-                p: 3,
+                py: 6,
+                fontFamily: 'Inter, Roboto, Arial, sans-serif',
             }}
         >
-            <CheckCircle sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
-            <Typography variant="h3" component="h1" fontWeight="bold" gutterBottom>
-                Thank You!
-            </Typography>
-            <Typography variant="h6" color="text.secondary" sx={{ maxWidth: '600px', mb: 4 }}>
-                You have successfully completed the interview. Your responses have been submitted for analysis. You will be notified of the results.
-            </Typography>
-            <Box sx={{ width: '80%', maxWidth: '400px' }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Redirecting you to your dashboard in {countdown} seconds...
+            <Paper
+                elevation={3}
+                sx={{
+                    p: { xs: 2, sm: 5 },
+                    maxWidth: 500,
+                    width: '100%',
+                    mx: 2,
+                    background: 'rgba(24, 24, 24, 0.98)',
+                    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+                    color: '#fff',
+                    borderRadius: 3,
+                    fontFamily: 'inherit',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                }}
+            >
+                <CheckCircle sx={{ fontSize: 80, color: '#FFE066', mb: 2 }} />
+                <Typography variant="h3" component="h1" sx={{ fontWeight: 700, color: '#fff', mb: 1, fontFamily: 'inherit', letterSpacing: 0.5 }} gutterBottom>
+                    Thank You!
                 </Typography>
-                <LinearProgress variant="determinate" value={progress} />
-            </Box>
+                <Typography variant="h6" sx={{ color: '#bdbdbd', fontWeight: 400, maxWidth: '600px', mb: 4, fontFamily: 'inherit' }}>
+                    You have successfully completed the interview. Your responses have been submitted for analysis. You will be notified of the results.
+                </Typography>
+                <Box sx={{ width: '80%', maxWidth: '400px' }}>
+                    <Typography variant="body2" sx={{ color: '#bdbdbd', mb: 1, fontFamily: 'inherit' }}>
+                        Redirecting you to your dashboard in {countdown} seconds...
+                    </Typography>
+                    <LinearProgress
+                        variant="determinate"
+                        value={progress}
+                        sx={{
+                            height: 10,
+                            borderRadius: 5,
+                            background: '#232526',
+                            '& .MuiLinearProgress-bar': {
+                                backgroundColor: '#FFE066',
+                                borderRadius: 5,
+                            },
+                        }}
+                    />
+                </Box>
+            </Paper>
         </Box>
     );
 };

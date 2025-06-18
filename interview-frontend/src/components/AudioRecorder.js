@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as apiClient from '../services/apiClient';
+import { Box, Button, Typography, Paper, CircularProgress } from '@mui/material';
 
 const RecorderState = {
     IDLE: 'idle',
@@ -104,27 +105,66 @@ const AudioRecorder = ({ stream, onTranscriptionComplete }) => {
     };
 
     let buttonText = 'Record';
-    let buttonClass = 'bg-blue-600 hover:bg-blue-700';
+    let buttonColor = '#FFE066';
+    let buttonBg = 'transparent';
+    let buttonHoverBg = '#FFE066';
+    let buttonHoverColor = '#181818';
+    let buttonBorder = '#FFE066';
+    let buttonLoading = false;
     if (recorderState === RecorderState.RECORDING) {
         buttonText = 'Stop Recording';
-        buttonClass = 'bg-red-600 hover:bg-red-700 animate-pulse';
+        buttonColor = '#fff';
+        buttonBg = '#ff5252';
+        buttonHoverBg = '#ff5252';
+        buttonHoverColor = '#fff';
+        buttonBorder = '#ff5252';
     } else if (recorderState === RecorderState.PROCESSING) {
         buttonText = 'Processing...';
-        buttonClass = 'bg-gray-500';
+        buttonColor = '#bdbdbd';
+        buttonBg = 'transparent';
+        buttonHoverBg = 'transparent';
+        buttonHoverColor = '#bdbdbd';
+        buttonBorder = '#bdbdbd';
+        buttonLoading = true;
     }
 
     return (
-        <div className="w-full max-w-2xl mx-auto p-4 text-center">
-            <button
-                onClick={handleToggleRecording}
-                disabled={recorderState === RecorderState.PROCESSING || !stream}
-                className={`px-8 py-4 text-xl font-bold rounded-full text-white transition-all duration-300 ease-in-out shadow-lg transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed ${buttonClass}`}
-            >
-                {buttonText}
-            </button>
-            
-            {error && <p className="text-red-500 mt-4">{error}</p>}
-        </div>
+        <Box sx={{ width: '100%', maxWidth: 520, mx: 'auto', p: 0, textAlign: 'center', fontFamily: 'Inter, Roboto, Arial, sans-serif' }}>
+            <Paper elevation={2} sx={{ p: 4, background: '#232526', borderRadius: 2, fontFamily: 'inherit', boxShadow: '0 4px 24px 0 #0002', mb: 2 }}>
+                <Button
+                    onClick={handleToggleRecording}
+                    disabled={recorderState === RecorderState.PROCESSING || !stream}
+                    sx={{
+                        color: buttonColor,
+                        background: buttonBg,
+                        borderColor: buttonBorder,
+                        borderWidth: 2,
+                        borderRadius: 1.5,
+                        py: 1.5,
+                        px: 6,
+                        minWidth: '180px',
+                        fontSize: '1.1rem',
+                        fontWeight: 700,
+                        fontFamily: 'inherit',
+                        boxShadow: 'none',
+                        borderStyle: 'solid',
+                        letterSpacing: 1,
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                            backgroundColor: buttonHoverBg,
+                            color: buttonHoverColor,
+                            borderColor: buttonBorder,
+                            boxShadow: '0 0 16px 0 #ffe06644',
+                        },
+                        opacity: recorderState === RecorderState.PROCESSING || !stream ? 0.5 : 1,
+                        cursor: recorderState === RecorderState.PROCESSING || !stream ? 'not-allowed' : 'pointer',
+                    }}
+                >
+                    {buttonLoading ? <CircularProgress size={24} sx={{ color: buttonColor }} /> : buttonText}
+                </Button>
+                {error && <Typography sx={{ color: '#ff5252', mt: 3, fontFamily: 'inherit', fontWeight: 500 }}>{error}</Typography>}
+            </Paper>
+        </Box>
     );
 };
 
