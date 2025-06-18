@@ -12,7 +12,6 @@ const { AppError } = require('../middleware/errorHandler');
  * @access  Private
  */
 router.post('/:sessionId', protect, asyncHandler(async (req, res) => {
-    // This endpoint can be used to explicitly trigger report generation, e.g., by the candidate.
     const report = await interviewService.finalizeAndGenerateReport(req.params.sessionId);
     res.status(201).json({ success: true, data: report });
 }));
@@ -25,9 +24,6 @@ router.post('/:sessionId', protect, asyncHandler(async (req, res) => {
 router.get('/:sessionId', protect, asyncHandler(async (req, res) => {
     const { sessionId } = req.params;
 
-    // --- FIX: Implement "Get-or-Create" Logic ---
-
-    // 1. First, try to find the report.
     let report = await InterviewReport.findOne({ session: sessionId }).populate({
         path: 'session',
         populate: [
@@ -36,19 +32,13 @@ router.get('/:sessionId', protect, asyncHandler(async (req, res) => {
         ]
     });
     
-    // 2. If the report is found, return it immediately.
     if (report) {
         return res.status(200).json({ success: true, data: report });
     }
 
-    // 3. If the report is NOT found, generate it on-the-fly.
     console.log(`Report for session ${sessionId} not found. Generating on-demand...`);
-    
-    // The service function creates the report.
     const newReport = await interviewService.finalizeAndGenerateReport(sessionId);
 
-    // 4. After creating, fetch it again to populate the nested fields ('session', 'candidate', etc.)
-    // to ensure a consistent response format for the frontend.
     const populatedReport = await InterviewReport.findById(newReport._id).populate({
         path: 'session',
         populate: [
@@ -58,11 +48,26 @@ router.get('/:sessionId', protect, asyncHandler(async (req, res) => {
     });
     
     if (!populatedReport) {
-        // This is an unlikely edge case but handled for safety.
         throw new AppError(500, 'Failed to retrieve the report after generating it.');
     }
 
     res.status(200).json({ success: true, data: populatedReport });
+}));
+
+/**
+ * NEW: Get all individual responses for a given session.
+ * @desc    Get paginated responses for a specific interview session.
+ * @route   GET /api/reports/:sessionId/responses
+ * @access  Private
+ */
+router.get('/:sessionId/responses', protect, asyncHandler(async (req, res) => {
+    const { sessionId } = req.params;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 5;
+
+    const data = await interviewService.getSessionResponses(sessionId, page, limit);
+
+    res.status(200).json({ success: true, ...data });
 }));
 
 module.exports = router;

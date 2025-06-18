@@ -21,8 +21,8 @@ const CandidateDashboard = ({ user }) => {
     }, []);
 
     const handleStartInterview = (uniqueLink) => {
-        // This changes the URL, and the App component's router will render the InterviewPage
-        window.location.pathname = `/interview/${uniqueLink}`;
+        // FIX: Navigate to the new instructions page first.
+        window.location.pathname = `/instructions/${uniqueLink}`;
     };
 
     return (

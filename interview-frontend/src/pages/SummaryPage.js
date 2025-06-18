@@ -1,51 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import * as apiClient from '../services/apiClient';
+import React from 'react';
 
 /**
- * Renders the final report for a completed interview session.
- * It fetches the report data based on the session ID from the URL.
+ * A purely presentational component for displaying the final report summary.
+ * It receives the fully populated report object as a prop.
  */
-const SummaryPage = ({ sessionId }) => {
-    const [report, setReport] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState('');
-
-    useEffect(() => {
-        if (!sessionId) {
-            setError("No session ID was provided to generate a report.");
-            setIsLoading(false);
-            return;
-        }
-
-        const fetchReport = async () => {
-            setIsLoading(true);
-            try {
-                // FIX: Use the correct, renamed function 'getReport'
-                const response = await apiClient.getReport(sessionId);
-                setReport(response.data); // The report data is nested in the 'data' property
-            } catch (err) {
-                setError(err.message || "Failed to load the interview report. It may still be generating.");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        
-        fetchReport();
-    }, [sessionId]);
-
-    if (isLoading) {
-        return <p className="text-center text-lg p-10">Generating final report, please wait...</p>;
-    }
-    if (error) {
-        return <p className="text-center text-lg text-red-500 p-10">{error}</p>;
-    }
+const SummaryPage = ({ reportData: report }) => {
     if (!report) {
-        return <p className="text-center text-lg p-10">No summary data available for this session.</p>;
+        return <div className="text-center p-12">Report data is not available.</div>;
     }
 
-    // New data structure based on the InterviewReport model
     const { overallScore, recommendation, strengths, areasForImprovement, session } = report;
-    const { candidate, template } = session;
+    const { candidate, template } = session || {};
 
     return (
         <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
@@ -75,11 +40,11 @@ const SummaryPage = ({ sessionId }) => {
                         <div className="grid md:grid-cols-2 gap-6">
                             <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                                 <h4 className="font-bold text-green-800 mb-2">Strengths</h4>
-                                <p className="text-green-700 whitespace-pre-wrap">{strengths || 'No specific strengths highlighted.'}</p>
+                                <p className="text-green-700 whitespace-pre-wrap">{Array.isArray(strengths) ? strengths.join('\n') : (strengths && typeof strengths === 'string') ? strengths : 'No specific strengths highlighted.'}</p>
                             </div>
                             <div className="bg-red-50 p-4 rounded-lg border border-red-200">
                                 <h4 className="font-bold text-red-800 mb-2">Areas for Improvement</h4>
-                                <p className="text-red-700 whitespace-pre-wrap">{areasForImprovement || 'No specific areas for improvement highlighted.'}</p>
+                                <p className="text-red-700 whitespace-pre-wrap">{Array.isArray(areasForImprovement) ? areasForImprovement.join('\n') : (areasForImprovement && typeof areasForImprovement === 'string') ? areasForImprovement : 'No specific areas for improvement highlighted.'}</p>
                             </div>
                         </div>
                     </div>

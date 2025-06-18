@@ -10,11 +10,10 @@ import {
     InputAdornment,
     Alert,
     CircularProgress,
-    Link
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 
-const LoginPage = ({ onLoginSuccess, onSwitchToRegister }) => {
+const LoginPage = ({ onLoginSuccess }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -64,7 +63,7 @@ const LoginPage = ({ onLoginSuccess, onSwitchToRegister }) => {
                     }}
                 >
                     <Typography component="h1" variant="h4" sx={{ mb: 3, color: 'primary.main' }}>
-                        Welcome Back
+                        AI Interview Portal
                     </Typography>
                     <Typography component="h2" variant="h6" sx={{ mb: 3, color: 'text.secondary' }}>
                         Sign in to your account
@@ -146,17 +145,6 @@ const LoginPage = ({ onLoginSuccess, onSwitchToRegister }) => {
                                 'Sign In'
                             )}
                         </Button>
-
-                        <Box sx={{ textAlign: 'center' }}>
-                            <Link
-                                component="button"
-                                variant="body2"
-                                onClick={onSwitchToRegister}
-                                sx={{ textDecoration: 'none' }}
-                            >
-                                Don't have an account? Register here
-                            </Link>
-                        </Box>
                     </Box>
                 </Paper>
             </Box>

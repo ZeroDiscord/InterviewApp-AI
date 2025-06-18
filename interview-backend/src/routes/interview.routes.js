@@ -12,7 +12,8 @@ const {
     getSessionByLink,
     submitResponse, 
     getMySessions,
-    getCompletedSessions
+    getCompletedSessions,
+    getSessionDetailsForAdmin
 } = require('../controllers/interview.controller');
 
 const config = require('../config');
@@ -45,15 +46,6 @@ router.post('/transcribe', protect, upload.single('audio'), asyncHandler(transcr
 router.post('/sessions', protect, authorize('admin', 'interviewer', 'hr_manager'), asyncHandler(createSession));
 router.post('/sessions/:sessionId/responses', protect, asyncHandler(submitResponse));
 router.get('/sessions/my-sessions', protect, authorize('candidate'), asyncHandler(getMySessions));
-
-
-// --- FIX: The specific static route is now defined BEFORE the dynamic route ---
-
-/**
- * Route to get all completed sessions for the admin panel table.
- * @route   GET /api/interview/sessions/completed
- * @access  Private (Admin, Interviewer, HR Manager)
- */
 router.get(
     '/sessions/completed',
     protect,
@@ -62,11 +54,18 @@ router.get(
 );
 
 /**
- * Route to get a specific interview session to start it.
- * This MUST be defined after more specific '/sessions/*' routes.
- * @route   GET /api/interview/sessions/:uniqueLink
- * @access  Private
+ * NEW: Route for admins to get full details of any session.
+ * @route   GET /api/interview/sessions/:sessionId/details
+ * @access  Private (Admin, Interviewer, HR Manager)
  */
+router.get(
+    '/sessions/:sessionId/details',
+    protect,
+    authorize('admin', 'interviewer', 'hr_manager'),
+    asyncHandler(getSessionDetailsForAdmin)
+);
+
+// This dynamic route must be last to avoid catching specific routes like '/completed' or '/details'
 router.get('/sessions/:uniqueLink', protect, asyncHandler(getSessionByLink));
 
 

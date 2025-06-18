@@ -104,12 +104,6 @@ const getMySessions = async (req, res) => {
     });
 };
 
-/**
- * NEW: Get all completed interview sessions with pagination
- * @desc    Get paginated completed interview sessions
- * @route   GET /api/interview/sessions/completed
- * @access  Private (Admin, Interviewer, HR Manager)
- */
 const getCompletedSessions = async (req, res) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 5;
@@ -135,6 +129,31 @@ const getCompletedSessions = async (req, res) => {
     });
 };
 
+/**
+ * NEW: Get full session details for an admin/interviewer view.
+ * @desc    Get a single interview session's full data, including answers.
+ * @route   GET /api/interview/sessions/:sessionId/details
+ * @access  Private (Admin, Interviewer, HR Manager)
+ */
+const getSessionDetailsForAdmin = async (req, res) => {
+    const { sessionId } = req.params;
+
+    const session = await InterviewSession.findById(sessionId)
+        .populate('template')
+        .populate('candidate');
+    
+    if (!session) {
+        throw new AppError(404, 'Session not found.');
+    }
+
+    // Unlike getSessionByLink, this returns the full question objects
+    // including idealAnswer and keywords for admin review.
+    res.status(200).json({
+        success: true,
+        data: session,
+    });
+};
+
 
 module.exports = {
     createSession,
@@ -143,4 +162,5 @@ module.exports = {
     transcribeResponse,
     getMySessions,
     getCompletedSessions,
+    getSessionDetailsForAdmin,
 };

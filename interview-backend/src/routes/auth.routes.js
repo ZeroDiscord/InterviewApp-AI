@@ -2,13 +2,19 @@ const express = require('express');
 const router = express.Router();
 const { registerUser, loginUser } = require('../controllers/auth.controller');
 const asyncHandler = require('../middleware/asyncHandler');
+const { protect, authorize } = require('../middleware/auth.middleware');
 
 /**
  * @route   POST /api/auth/register
  * @desc    Register a new user
- * @access  Public
+ * @access  Private (Admin & HR Manager only)
  */
-router.post('/register', asyncHandler(registerUser));
+router.post(
+    '/register',
+    protect, // 1. User must be logged in.
+    authorize('admin', 'hr_manager'), // 2. User must have a permitted role.
+    asyncHandler(registerUser)
+);
 
 /**
  * @route   POST /api/auth/login
@@ -17,6 +23,5 @@ router.post('/register', asyncHandler(registerUser));
  */
 router.post('/login', asyncHandler(loginUser));
 
-// Note: Other auth endpoints like logout, refresh-token, etc., will be added here later.
 
 module.exports = router;

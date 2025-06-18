@@ -57,17 +57,19 @@ export const createSession = (sessionData) => request('/interview/sessions', { m
 export const getSessionByLink = (uniqueLink) => request(`/interview/sessions/${uniqueLink}`);
 export const submitResponse = (sessionId, responseData) => request(`/interview/sessions/${sessionId}/responses`, { method: 'POST', body: JSON.stringify(responseData) });
 export const getMySessions = () => request('/interview/sessions/my-sessions');
-
+export const getCompletedSessions = (page = 1, limit = 5) => request(`/interview/sessions/completed?page=${page}&limit=${limit}`);
 
 /**
- * NEW: Fetches a paginated list of completed interview sessions.
- * @param {number} page - The page number to fetch.
- * @param {number} limit - The number of results per page.
+ * Fetches the full session details for an admin, including ideal answers.
+ * @param {string} sessionId The ID of the session.
  */
-export const getCompletedSessions = (page = 1, limit = 5) => {
-    return request(`/interview/sessions/completed?page=${page}&limit=${limit}`);
-};
+export const getSessionDetailsForAdmin = (sessionId) => request(`/interview/sessions/${sessionId}/details`);
 
-
+/**
+ * Fetches the paginated list of individual candidate responses for a session.
+ * @param {string} sessionId The ID of the session.
+ * @param {number} page The page number to fetch.
+ */
+export const getSessionResponses = (sessionId, page = 1) => request(`/reports/${sessionId}/responses?page=${page}`);
 export const generateReport = (sessionId) => request(`/reports/${sessionId}`, { method: 'POST' });
 export const getReport = (sessionId) => request(`/reports/${sessionId}`);

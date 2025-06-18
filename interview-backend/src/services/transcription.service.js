@@ -44,11 +44,12 @@ const transcribeAudio = async (audioFilePath) => {
             throw new Error('Failed to make a request to the transcription service.');
         }
     } finally {
-        fs.unlink(audioFilePath, (err) => {
-            if (err) {
-                console.error(`Failed to delete temporary audio file: ${audioFilePath}`, err);
-            }
-        });
+        // to delete the temporary audio file after transcription
+        // fs.unlink(audioFilePath, (err) => {
+        //     if (err) {
+        //         console.error(`Failed to delete temporary audio file: ${audioFilePath}`, err);
+        //     }
+        // });
     }
 };
 

@@ -1,166 +1,129 @@
-import React, { useState, useRef } from 'react';
-import useSpeechRecognition from '../hooks/useSpeechRecognition';
+import React, { useState, useRef, useEffect } from 'react';
 import * as apiClient from '../services/apiClient';
 
-// Enum for the different states of the recorder
 const RecorderState = {
     IDLE: 'idle',
     RECORDING: 'recording',
     PROCESSING: 'processing',
-    REVIEWING: 'reviewing',
 };
 
+const supportedMimeTypes = [
+    'audio/webm',
+    'audio/webm;codecs=opus',
+    'audio/ogg;codecs=opus',
+    'audio/ogg',
+    'audio/mp4',
+];
+
 /**
- * AudioRecorder Component
+ * An AudioRecorder that is decoupled from the submission process.
+ * It records, transcribes, and then passes the result to the parent via a callback.
  * @param {object} props - Component props.
- * @param {function} props.onSubmission - Callback with { transcription, audioFileUrl }.
- * @param {boolean} props.isSubmitting - Flag to disable buttons during parent submission.
+ * @param {MediaStream} props.stream - The active audio stream.
+ * @param {function} props.onTranscriptionComplete - Callback with { transcription, audioFileUrl, isEmpty }.
  */
-const AudioRecorder = ({ onSubmission, isSubmitting }) => {
+const AudioRecorder = ({ stream, onTranscriptionComplete }) => {
     const [recorderState, setRecorderState] = useState(RecorderState.IDLE);
-    const [transcript, setTranscript] = useState('');
-    const [processingError, setProcessingError] = useState('');
-    const [refinedAudioUrl, setRefinedAudioUrl] = useState('');
+    const [error, setError] = useState('');
 
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
 
-    const {
-        isRecording,
-        startListening,
-        stopListening,
-    } = useSpeechRecognition({
-        onResult: (newChunk) => setTranscript(current => current + newChunk),
-    });
-
-    const handleStartRecording = async () => {
-        setTranscript('');
-        setProcessingError('');
-        setRefinedAudioUrl('');
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-            audioChunksRef.current = [];
-
-            mediaRecorderRef.current.ondataavailable = (event) => {
-                if (event.data.size > 0) audioChunksRef.current.push(event.data);
-            };
-
-            mediaRecorderRef.current.onstop = () => {
-                stream.getTracks().forEach(track => track.stop());
-            };
-
-            mediaRecorderRef.current.start();
-            startListening();
-            setRecorderState(RecorderState.RECORDING);
-        } catch (err) {
-            console.error("Error starting recording:", err);
-            setProcessingError("Could not access microphone. Please check your browser permissions.");
-        }
-    };
-
-    const handleStopRecording = () => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-            mediaRecorderRef.current.stop();
-        }
-        stopListening();
-        setRecorderState(RecorderState.REVIEWING);
-    };
-
-    const handleRefineTranscript = async () => {
-        if (audioChunksRef.current.length === 0) {
-            setProcessingError("No audio was recorded to refine.");
-            return;
-        }
-        setRecorderState(RecorderState.PROCESSING);
-        setProcessingError('');
-
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-
-        try {
-            const result = await apiClient.transcribeAudio(audioBlob);
-            setTranscript(result.transcription);
-            setRefinedAudioUrl(result.audioFileUrl);
-        } catch (err) {
-            setProcessingError(err.message || "Failed to refine transcript.");
-        } finally {
-            setRecorderState(RecorderState.REVIEWING);
-        }
-    };
-
-    const handleSubmit = () => {
-        if (transcript.trim() && refinedAudioUrl) {
-            onSubmission({ transcription: transcript, audioFileUrl: refinedAudioUrl });
-            setTranscript('');
-            setRefinedAudioUrl('');
-            setRecorderState(RecorderState.IDLE);
-        } else {
-            setProcessingError('Please refine the transcript with AI before submitting to get the audio URL.');
-        }
-    };
-
-    const handleReset = () => {
-        if (isRecording) stopListening();
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-            mediaRecorderRef.current.stop();
-        }
-        setTranscript('');
-        setRefinedAudioUrl('');
-        audioChunksRef.current = [];
-        setProcessingError('');
+    // Reset component state if the stream prop changes (e.g., when moving to a new question)
+    useEffect(() => {
         setRecorderState(RecorderState.IDLE);
+        setError('');
+    }, [stream]);
+
+    const handleToggleRecording = async () => {
+        setError('');
+
+        // --- Start Recording ---
+        if (recorderState === RecorderState.IDLE) {
+            if (!stream || !stream.active) {
+                setError("Microphone stream not available. Please allow access.");
+                return;
+            }
+            const mimeType = supportedMimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+            if (!mimeType) {
+                setError("Your browser does not support required audio recording formats.");
+                return;
+            }
+
+            try {
+                const audioStream = new MediaStream(stream.getAudioTracks());
+                mediaRecorderRef.current = new MediaRecorder(audioStream, { mimeType });
+                audioChunksRef.current = [];
+
+                mediaRecorderRef.current.ondataavailable = (event) => {
+                    if (event.data.size > 0) audioChunksRef.current.push(event.data);
+                };
+
+                mediaRecorderRef.current.onstop = async () => {
+                    setRecorderState(RecorderState.PROCESSING);
+                    
+                    // --- FIX 1: Handle Empty Audio Recording ---
+                    // If no audio chunks were recorded, notify the parent that the recording was empty.
+                    if (audioChunksRef.current.length === 0) {
+                        onTranscriptionComplete({ transcription: "", audioFileUrl: "N/A", isEmpty: true });
+                        setRecorderState(RecorderState.IDLE); // Reset for next attempt
+                        return;
+                    }
+
+                    const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+                    
+                    try {
+                        const result = await apiClient.transcribeAudio(audioBlob);
+                        // Pass the successful result up to the parent.
+                        onTranscriptionComplete({ 
+                            transcription: result.transcription, 
+                            audioFileUrl: result.audioFileUrl,
+                            isEmpty: false 
+                        });
+                    } catch (err) {
+                        setError(err.message || "Failed to transcribe audio.");
+                    } finally {
+                        setRecorderState(RecorderState.IDLE); // Reset after processing
+                    }
+                };
+
+                mediaRecorderRef.current.start();
+                setRecorderState(RecorderState.RECORDING);
+
+            } catch (err) {
+                console.error("Error starting media recorder:", err);
+                setError("Could not start the media recorder. " + err.message);
+            }
+        } 
+        // --- Stop Recording ---
+        else if (recorderState === RecorderState.RECORDING) {
+            if (mediaRecorderRef.current) {
+                mediaRecorderRef.current.stop();
+            }
+        }
     };
 
-    const isRecordingOrProcessing = recorderState === RecorderState.RECORDING || recorderState === RecorderState.PROCESSING || isSubmitting;
+    let buttonText = 'Record';
+    let buttonClass = 'bg-blue-600 hover:bg-blue-700';
+    if (recorderState === RecorderState.RECORDING) {
+        buttonText = 'Stop Recording';
+        buttonClass = 'bg-red-600 hover:bg-red-700 animate-pulse';
+    } else if (recorderState === RecorderState.PROCESSING) {
+        buttonText = 'Processing...';
+        buttonClass = 'bg-gray-500';
+    }
 
     return (
-        <div className="w-full max-w-2xl mx-auto p-4 border rounded-lg shadow-md bg-gray-50">
-            <textarea
-                value={transcript}
-                onChange={(e) => setTranscript(e.target.value)}
-                placeholder={recorderState === RecorderState.IDLE ? "Click 'Record' to start answering." : "Your transcription will appear here..."}
-                className="w-full h-40 p-3 border rounded-md bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-                disabled={isRecordingOrProcessing}
-            />
-
-            {processingError && (
-                <div className="my-2 p-3 bg-red-100 text-red-800 rounded-md text-center">
-                    <p>{processingError}</p>
-                </div>
-            )}
+        <div className="w-full max-w-2xl mx-auto p-4 text-center">
+            <button
+                onClick={handleToggleRecording}
+                disabled={recorderState === RecorderState.PROCESSING || !stream}
+                className={`px-8 py-4 text-xl font-bold rounded-full text-white transition-all duration-300 ease-in-out shadow-lg transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed ${buttonClass}`}
+            >
+                {buttonText}
+            </button>
             
-            <div className="flex items-center justify-center flex-wrap gap-4">
-                {recorderState === RecorderState.IDLE && (
-                     <button onClick={handleStartRecording} className="px-6 py-3 font-semibold rounded-full text-white bg-blue-600 hover:bg-blue-700 w-40">
-                        Record
-                    </button>
-                )}
-
-                {recorderState === RecorderState.RECORDING && (
-                     <button onClick={handleStopRecording} className="px-6 py-3 font-semibold rounded-full text-white bg-red-600 hover:bg-red-700 w-40">
-                        Stop
-                    </button>
-                )}
-
-                {recorderState === RecorderState.REVIEWING && (
-                    <>
-                        <button onClick={handleRefineTranscript} disabled={!audioChunksRef.current.length} className="px-6 py-3 font-semibold rounded-full text-white bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 w-40">
-                            Transcribe
-                        </button>
-                        <button onClick={handleSubmit} disabled={!transcript.trim() || !refinedAudioUrl || isSubmitting} className="px-6 py-3 font-semibold rounded-full text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-400 w-40">
-                            {isSubmitting ? 'Submitting...' : 'Submit Answer'}
-                        </button>
-                    </>
-                )}
-
-                 {recorderState === RecorderState.PROCESSING && (
-                    <div className="w-40 text-center text-gray-600">Refining...</div>
-                )}
-                
-                <button onClick={handleReset} disabled={isRecordingOrProcessing} className="px-6 py-3 font-semibold rounded-full text-gray-700 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors w-40">
-                    Reset
-                </button>
-            </div>
+            {error && <p className="text-red-500 mt-4">{error}</p>}
         </div>
     );
 };
