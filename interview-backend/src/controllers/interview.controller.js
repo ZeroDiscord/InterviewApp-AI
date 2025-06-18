@@ -1,0 +1,146 @@
+const interviewService = require('../services/interview.service.js');
+const { transcribeAudio } = require('../services/transcription.service');
+const { AppError } = require('../middleware/errorHandler');
+const InterviewSession = require('../models/interviewSession.model.js');
+
+
+const createSession = async (req, res) => {
+    const { templateId, candidateId, scheduledAt } = req.body;
+    const interviewerId = req.user._id;
+
+    if (!templateId || !candidateId) {
+        throw new AppError(400, 'Template ID and Candidate ID are required.');
+    }
+
+    const sessionData = { templateId, candidateId, interviewerId, scheduledAt };
+    const newSession = await interviewService.createSessionFromTemplate(sessionData);
+
+    res.status(201).json({
+        success: true,
+        message: 'Interview session created successfully.',
+        data: newSession,
+    });
+};
+
+const getSessionByLink = async (req, res) => {
+    const { uniqueLink } = req.params;
+    
+    const session = await InterviewSession.findOne({ uniqueLink })
+        .populate('template', 'title description durationMinutes')
+        .populate('candidate', 'firstName lastName email');
+
+    if (!session) {
+        throw new AppError(404, 'Interview session not found. Please check your link.');
+    }
+    
+    if (session.candidate._id.toString() !== req.user._id.toString()) {
+        throw new AppError(403, 'You are not authorized to start this interview session.');
+    }
+
+    if (session.status === 'scheduled') {
+        session.status = 'in_progress';
+        session.startedAt = new Date();
+        await session.save();
+    }
+
+    const questionsForCandidate = session.questions.map(q => ({
+        _id: q._id,
+        questionText: q.questionText,
+        questionType: q.questionType,
+        difficulty: q.difficulty,
+        timeLimitSeconds: q.timeLimitSeconds
+    }));
+
+    const responsePayload = {
+        _id: session._id,
+        template: session.template,
+        candidate: session.candidate,
+        status: session.status,
+        questions: questionsForCandidate,
+        currentQuestionIndex: session.currentQuestionIndex,
+    };
+
+    res.status(200).json({ success: true, data: responsePayload });
+};
+
+const submitResponse = async (req, res) => {
+    const { sessionId } = req.params;
+    const { questionId, transcribedText, audioFileUrl, duration } = req.body;
+    const userId = req.user._id;
+
+    if (!questionId || !transcribedText || !audioFileUrl) {
+        throw new AppError(400, 'questionId, transcribedText, and audioFileUrl are required.');
+    }
+
+    const responseData = { transcribedText, audioFileUrl, duration };
+    const result = await interviewService.submitResponse({ sessionId, questionId, userId, responseData });
+
+    res.status(200).json({ success: true, data: result });
+};
+
+
+const transcribeResponse = async (req, res) => {
+    if (!req.file) {
+        throw new AppError(400, 'No audio file was uploaded.');
+    }
+    const transcribedText = await transcribeAudio(req.file.path);
+    const audioUrl = `/uploads/${req.file.filename}`;
+    res.status(200).json({
+        success: true,
+        transcription: transcribedText,
+        audioFileUrl: audioUrl,
+    });
+};
+
+const getMySessions = async (req, res) => {
+    const sessions = await InterviewSession.find({ candidate: req.user._id })
+      .populate('template', 'title description')
+      .sort({ scheduledAt: -1 });
+
+    res.status(200).json({
+        success: true,
+        count: sessions.length,
+        data: sessions,
+    });
+};
+
+/**
+ * NEW: Get all completed interview sessions with pagination
+ * @desc    Get paginated completed interview sessions
+ * @route   GET /api/interview/sessions/completed
+ * @access  Private (Admin, Interviewer, HR Manager)
+ */
+const getCompletedSessions = async (req, res) => {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 5;
+    const skip = (page - 1) * limit;
+
+    const total = await InterviewSession.countDocuments({ status: 'completed' });
+    const sessions = await InterviewSession.find({ status: 'completed' })
+        .populate('candidate', 'firstName lastName email')
+        .populate('template', 'title')
+        .sort({ completedAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    res.status(200).json({
+        success: true,
+        count: sessions.length,
+        pagination: {
+            page,
+            totalPages: Math.ceil(total / limit),
+            totalRecords: total
+        },
+        data: sessions,
+    });
+};
+
+
+module.exports = {
+    createSession,
+    getSessionByLink,
+    submitResponse,
+    transcribeResponse,
+    getMySessions,
+    getCompletedSessions,
+};

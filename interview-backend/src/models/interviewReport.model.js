@@ -1,0 +1,67 @@
+const mongoose = require('mongoose');
+
+/**
+ * Defines the schema for the final Interview Report.
+ * This model stores a comprehensive summary and analysis of a completed interview session.
+ */
+const interviewReportSchema = new mongoose.Schema({
+    // Link to the interview session this report summarizes.
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'InterviewSession',
+        required: true,
+        unique: true, // A session should only have one final report.
+        index: true
+    },
+    // Overall score for the interview, typically an average or weighted average.
+    overallScore: {
+        type: Number,
+        min: 0,
+        max: 100
+    },
+    // Sub-scores for different categories, calculated from question types.
+    technicalScore: {
+        type: Number,
+        min: 0,
+        max: 100
+    },
+    communicationScore: {
+        type: Number,
+        min: 0,
+        max: 100
+    },
+    culturalFitScore: {
+        type: Number,
+        min: 0,
+        max: 100
+    },
+    // --- FIX: Changed type from String to [String] to accept an array of strings ---
+    strengths: {
+        type: [String],
+        default: []
+    },
+    // --- FIX: Changed type from String to [String] to accept an array of strings ---
+    areasForImprovement: {
+        type: [String],
+        default: []
+    },
+    // Final recommendation based on the overall performance.
+    recommendation: {
+        type: String,
+        enum: ['strong_hire', 'hire', 'maybe', 'no_hire'],
+        default: 'maybe'
+    },
+    // A field to store the detailed breakdown of each question's analysis for quick retrieval.
+    detailedAnalysis: {
+        type: mongoose.Schema.Types.Mixed
+    }
+}, {
+    timestamps: {
+        createdAt: 'generatedAt',
+        updatedAt: false
+    }
+});
+
+const InterviewReport = mongoose.model('InterviewReport', interviewReportSchema);
+
+module.exports = InterviewReport;
