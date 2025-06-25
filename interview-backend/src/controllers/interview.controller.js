@@ -2,6 +2,8 @@ const interviewService = require('../services/interview.service.js');
 const { transcribeAudio } = require('../services/transcription.service');
 const { AppError } = require('../middleware/errorHandler');
 const InterviewSession = require('../models/interviewSession.model.js');
+const User = require('../models/user.model.js');
+const { sendInviteEmail, sendDecisionEmail } = require('../utils/mail');
 
 
 const createSession = async (req, res) => {
@@ -14,6 +16,13 @@ const createSession = async (req, res) => {
 
     const sessionData = { templateId, candidateId, interviewerId, scheduledAt };
     const newSession = await interviewService.createSessionFromTemplate(sessionData);
+
+    // Send invitation email to the candidate
+    const candidate = await User.findById(candidateId);
+    if (candidate) {
+        const interviewLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/instructions/${newSession.uniqueLink}`;
+        await sendInviteEmail(candidate.email, interviewLink, candidate.firstName);
+    }
 
     res.status(201).json({
         success: true,
@@ -167,6 +176,26 @@ const markSessionCompletedOrTerminated = async (req, res) => {
     res.status(200).json({ success: true, data: session });
 };
 
+const submitDecision = async (req, res) => {
+    const { sessionId } = req.params;
+    const { decision, comments } = req.body;
+    const adminId = req.user._id; // The admin/recruiter making the decision
+
+    // The service will handle validation, DB updates, and sending the email.
+    const updatedSession = await interviewService.submitDecision({
+        sessionId,
+        decision,
+        comments,
+        adminId,
+    });
+
+    res.status(200).json({
+        success: true,
+        message: `Session has been marked as ${decision}.`,
+        data: updatedSession,
+    });
+};
+
 module.exports = {
     createSession,
     getSessionByLink,
@@ -176,4 +205,5 @@ module.exports = {
     getCompletedSessions,
     getSessionDetailsForAdmin,
     markSessionCompletedOrTerminated,
+    submitDecision,
 };

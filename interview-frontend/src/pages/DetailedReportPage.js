@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as apiClient from '../services/apiClient';
 import SummaryPage from './SummaryPage';
-import { Box, Typography, Paper, Button, Alert, IconButton, CircularProgress } from '@mui/material';
+import {
+    Box, Typography, Paper, Button, Alert, IconButton, CircularProgress,
+    Modal, TextField, Backdrop, Fade
+} from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 
 const TabButton = ({ children, isActive, onClick }) => (
     <Button
@@ -31,6 +36,21 @@ const TabButton = ({ children, isActive, onClick }) => (
     </Button>
 );
 
+const modalStyle = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: 450,
+  bgcolor: '#1E1E1E',
+  border: '1px solid #FFE066',
+  borderRadius: 4,
+  boxShadow: 24,
+  p: 4,
+  color: '#fff',
+  fontFamily: 'inherit',
+};
+
 const DetailedReportPage = ({ sessionId, onBack }) => {
     const [activeTab, setActiveTab] = useState('summary');
     const [reportData, setReportData] = useState(null);
@@ -39,6 +59,14 @@ const DetailedReportPage = ({ sessionId, onBack }) => {
     const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
+    const [decisionState, setDecisionState] = useState({
+        modalOpen: false,
+        decisionType: null, // 'approved' or 'rejected'
+        comments: '',
+        isSubmitting: false,
+        submitError: '',
+        decisionMade: null, // Stores the final decision
+    });
 
     const fetchAllReportData = useCallback(async (page = 1) => {
         setIsLoading(true);
@@ -67,6 +95,32 @@ const DetailedReportPage = ({ sessionId, onBack }) => {
     const handlePageChange = (newPage) => {
         if (newPage > 0 && newPage <= pagination.totalPages) {
             setPagination(prev => ({ ...prev, page: newPage }));
+        }
+    };
+
+    const handleOpenModal = (decisionType) => {
+        setDecisionState(prev => ({ ...prev, modalOpen: true, decisionType, submitError: '' }));
+    };
+
+    const handleCloseModal = () => {
+        setDecisionState(prev => ({ ...prev, modalOpen: false, comments: '' }));
+    };
+
+    const handleSubmitDecision = async () => {
+        setDecisionState(prev => ({ ...prev, isSubmitting: true, submitError: '' }));
+        try {
+            await apiClient.submitDecision(sessionId, {
+                decision: decisionState.decisionType,
+                comments: decisionState.comments
+            });
+            setDecisionState(prev => ({
+                ...prev,
+                isSubmitting: false,
+                modalOpen: false,
+                decisionMade: prev.decisionType,
+            }));
+        } catch (err) {
+            setDecisionState(prev => ({ ...prev, isSubmitting: false, submitError: err.message || 'Failed to submit decision.' }));
         }
     };
 
@@ -121,6 +175,74 @@ const DetailedReportPage = ({ sessionId, onBack }) => {
                 <Box sx={{ background: '#181818', borderRadius: '0 0 12px 12px', boxShadow: '0 4px 24px 0 #0002', mt: 0, fontFamily: 'inherit' }}>
                     {renderTabContent()}
                 </Box>
+                
+                {/* --- Decision Section --- */}
+                <Box sx={{ mt: 4, p: 3, background: '#181818', borderRadius: 2, textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: '#fff' }}>Recruiter Actions</Typography>
+                    {decisionState.decisionMade ? (
+                        <Alert
+                            severity={decisionState.decisionMade === 'approved' ? 'success' : 'error'}
+                            sx={{ justifyContent: 'center', fontWeight: 'bold' }}
+                        >
+                            Candidate has been {decisionState.decisionMade}.
+                        </Alert>
+                    ) : (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+                            <Button
+                                startIcon={<CheckCircleOutlineIcon />}
+                                onClick={() => handleOpenModal('approved')}
+                                sx={{ bgcolor: '#4caf50', color: '#fff', fontWeight: 'bold', '&:hover': { bgcolor: '#388e3c' } }}
+                            >
+                                Approve
+                            </Button>
+                            <Button
+                                startIcon={<HighlightOffIcon />}
+                                onClick={() => handleOpenModal('rejected')}
+                                sx={{ bgcolor: '#f44336', color: '#fff', fontWeight: 'bold', '&:hover': { bgcolor: '#d32f2f' } }}
+                            >
+                                Reject
+                            </Button>
+                        </Box>
+                    )}
+                </Box>
+
+                {/* --- Decision Modal --- */}
+                <Modal
+                    open={decisionState.modalOpen}
+                    onClose={handleCloseModal}
+                    closeAfterTransition
+                    slots={{ backdrop: Backdrop }}
+                    slotProps={{ backdrop: { timeout: 500 } }}
+                >
+                    <Fade in={decisionState.modalOpen}>
+                        <Box sx={modalStyle}>
+                            <Typography variant="h6" component="h2" sx={{ fontWeight: 'bold' }}>
+                                Confirm Decision: {decisionState.decisionType?.toUpperCase()}
+                            </Typography>
+                            <TextField
+                                fullWidth
+                                multiline
+                                rows={4}
+                                placeholder="Add optional feedback for the candidate..."
+                                value={decisionState.comments}
+                                onChange={(e) => setDecisionState(prev => ({ ...prev, comments: e.target.value }))}
+                                sx={{ my: 2, textarea: { color: '#fff' }, '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: '#444' } } }}
+                            />
+                            {decisionState.submitError && <Alert severity="error" sx={{ mb: 2 }}>{decisionState.submitError}</Alert>}
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                                <Button onClick={handleCloseModal} sx={{ color: '#bdbdbd' }}>Cancel</Button>
+                                <Button
+                                    onClick={handleSubmitDecision}
+                                    variant="contained"
+                                    disabled={decisionState.isSubmitting}
+                                    sx={{ bgcolor: decisionState.decisionType === 'approved' ? '#4caf50' : '#f44336' }}
+                                >
+                                    {decisionState.isSubmitting ? <CircularProgress size={24} /> : 'Submit'}
+                                </Button>
+                            </Box>
+                        </Box>
+                    </Fade>
+                </Modal>
             </Paper>
         </Box>
     );

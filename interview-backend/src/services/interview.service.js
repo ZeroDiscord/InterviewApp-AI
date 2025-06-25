@@ -5,6 +5,7 @@ const InterviewReport = require('../models/interviewReport.model');
 const User = require('../models/user.model');
 const { generateInterviewFromJD, processAnswer, generateFinalReport } = require('../controllers/aiController');
 const { AppError } = require('../middleware/errorHandler');
+const { sendReportEmail, sendDecisionEmail } = require('../utils/mail');
 
 const createSessionFromTemplate = async ({ templateId, candidateId, interviewerId, scheduledAt }) => {
     const template = await InterviewTemplate.findById(templateId);
@@ -158,6 +159,53 @@ const markSessionCompletedOrTerminated = async ({ sessionId, terminated, termina
     if (typeof warningCount === 'number') session.warningCount = Math.min(warningCount, 3);
     if (Array.isArray(proctoringEventLog)) session.proctoringEventLog = proctoringEventLog;
     await session.save();
+    if (session.status === 'completed') {
+        // Generate the final report
+        await finalizeAndGenerateReport(sessionId);
+
+        // Notify the recruiter
+        await session.populate('candidate interviewer');
+        if (session.interviewer && session.interviewer.email) {
+            const reportLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reports/${sessionId}`;
+            await sendReportEmail(session.interviewer.email, reportLink, session.candidate.firstName);
+        }
+    }
+    return session;
+};
+
+const submitDecision = async ({ sessionId, decision, comments, adminId }) => {
+    if (!['approved', 'rejected'].includes(decision)) {
+        throw new AppError(400, 'Decision must be either "approved" or "rejected".');
+    }
+
+    const session = await InterviewSession.findById(sessionId).populate('candidate');
+    if (!session) {
+        throw new AppError(404, 'Interview session not found.');
+    }
+
+    if (session.decision) {
+        throw new AppError(400, 'A decision has already been made for this session.');
+    }
+
+    session.decision = {
+        status: decision,
+        comments: comments,
+        decidedBy: adminId,
+        decidedAt: new Date(),
+    };
+
+    await session.save();
+
+    // Send notification email to the candidate
+    if (session.candidate && session.candidate.email) {
+        await sendDecisionEmail(
+            session.candidate.email,
+            decision,
+            comments,
+            session.candidate.firstName
+        );
+    }
+
     return session;
 };
 
@@ -167,4 +215,5 @@ module.exports = {
     finalizeAndGenerateReport,
     getSessionResponses,
     markSessionCompletedOrTerminated,
+    submitDecision,
 };

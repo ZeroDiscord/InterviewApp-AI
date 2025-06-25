@@ -76,3 +76,15 @@ export const getReport = (sessionId) => request(`/reports/${sessionId}`);
 
 export const markSessionCompletedOrTerminated = (sessionId, data) =>
   request(`/interview/sessions/${sessionId}/complete`, { method: 'POST', body: JSON.stringify(data) });
+
+/**
+ * Submits a decision for an interview session.
+ * @param {string} sessionId - The ID of the interview session.
+ * @param {'approved' | 'rejected'} decision - The decision status.
+ * @param {string} [comments] - Optional feedback comments.
+ */
+export const submitDecision = (sessionId, { decision, comments }) => 
+  request(`/interview/sessions/${sessionId}/decision`, {
+    method: 'POST',
+    body: JSON.stringify({ decision, comments }),
+  });

@@ -231,7 +231,7 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
             )}
             <form onSubmit={handleSubmit} autoComplete="off">
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, position: 'relative' }}>
                         <FormControl fullWidth sx={formControlStyles}>
                             <InputLabel id="template-label">Interview Template</InputLabel>
                             <Select
@@ -302,6 +302,34 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
                             slotProps={{ textField: { fullWidth: true } }}
                         />
 
+                        {/* Loading Overlay */}
+                        {isLoading && (
+                            <Box sx={{
+                                position: 'absolute',
+                                top: 0, left: 0, right: 0, bottom: 0,
+                                background: 'rgba(30, 30, 30, 0.85)',
+                                backdropFilter: 'blur(4px)',
+                                zIndex: 10,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 2,
+                                pointerEvents: 'all'
+                            }}>
+                                <CircularProgress size={48} sx={{ color: '#FFE066', mb: 3 }} />
+                                <Typography sx={{
+                                    color: '#FFE066',
+                                    fontWeight: 700,
+                                    fontSize: '1.2rem',
+                                    textAlign: 'center',
+                                    fontFamily: 'inherit',
+                                }}>
+                                    {loadingMessage}
+                                </Typography>
+                            </Box>
+                        )}
+                        
                         <Button
                             type="submit"
                             variant="contained"

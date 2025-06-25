@@ -14,7 +14,8 @@ const {
     getMySessions,
     getCompletedSessions,
     getSessionDetailsForAdmin,
-    markSessionCompletedOrTerminated
+    markSessionCompletedOrTerminated,
+    submitDecision
 } = require('../controllers/interview.controller');
 
 const config = require('../config');
@@ -72,5 +73,16 @@ router.post('/sessions/:sessionId/complete', protect, asyncHandler(markSessionCo
 // This dynamic route must be last to avoid catching specific routes like '/completed' or '/details'
 router.get('/sessions/:uniqueLink', protect, asyncHandler(getSessionByLink));
 
+/**
+ * @desc    Submit a decision (approve/reject) for an interview session
+ * @route   POST /api/interview/sessions/:sessionId/decision
+ * @access  Private (Admin, Interviewer, HR Manager)
+ */
+router.post(
+  '/sessions/:sessionId/decision',
+  protect,
+  authorize('admin', 'interviewer', 'hr_manager'),
+  asyncHandler(submitDecision)
+);
 
 module.exports = router;

@@ -207,7 +207,6 @@ const AdminPanel = ({ onViewReport }) => {
                                     >
                                         <MenuItem value="candidate" sx={{ fontFamily: 'inherit', color: '#fff', bgcolor: '#232526', '&:hover': { bgcolor: '#2a2a2a' } }}>Candidate</MenuItem>
                                         <MenuItem value="interviewer" sx={{ fontFamily: 'inherit', color: '#fff', bgcolor: '#232526', '&:hover': { bgcolor: '#2a2a2a' } }}>Interviewer</MenuItem>
-                                        <MenuItem value="ml_engineer" sx={{ fontFamily: 'inherit', color: '#fff', bgcolor: '#232526', '&:hover': { bgcolor: '#2a2a2a' } }}>ML Engineer</MenuItem>
                                         <MenuItem value="hr_manager" sx={{ fontFamily: 'inherit', color: '#fff', bgcolor: '#232526', '&:hover': { bgcolor: '#2a2a2a' } }}>HR Manager</MenuItem>
                                     </Select>
                                 </FormControl>
