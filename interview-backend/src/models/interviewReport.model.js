@@ -54,7 +54,24 @@ const interviewReportSchema = new mongoose.Schema({
     // A field to store the detailed breakdown of each question's analysis for quick retrieval.
     detailedAnalysis: {
         type: mongoose.Schema.Types.Mixed
-    }
+    },
+    // Proctoring analytics (copied from session at report generation time)
+    warningCount: {
+        type: Number,
+        default: 0
+    },
+    proctoringInfractions: {
+        type: [mongoose.Schema.Types.Mixed],
+        default: []
+    },
+    proctoringEventLog: {
+        type: [mongoose.Schema.Types.Mixed],
+        default: []
+    },
+    terminationReason: {
+        type: String,
+        default: null
+    },
 }, {
     timestamps: {
         createdAt: 'generatedAt',

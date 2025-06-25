@@ -19,7 +19,7 @@ const answerAnalysisConfig = {
 
 async function generateInterviewFromJD(jobDescription, numberOfQuestions) {
   console.log(`Generating ${numberOfQuestions} questions with creative config...`);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: questionGenerationConfig });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: questionGenerationConfig });
   const prompt = `
     You are an expert technical recruiter. Your task is to create a structured interview based on the provided job description.
     Generate exactly ${numberOfQuestions} diverse questions.
@@ -82,7 +82,7 @@ const processAnswer = async (userTranscription, questionDetails) => {
 };
 
 async function getSemanticConceptAnalysis(userAnswer, keyConcepts) {
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: answerAnalysisConfig });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: answerAnalysisConfig });
   const prompt = `
     You are a precise AI teaching assistant. Your only job is to determine which of the provided "Key Concepts" are semantically present in the "User's Answer".
     Your entire response must be ONLY the required JSON object, without any markdown.
@@ -96,7 +96,7 @@ async function getSemanticConceptAnalysis(userAnswer, keyConcepts) {
 }
 
 async function generateFinalReport(responses) {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: answerAnalysisConfig });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: answerAnalysisConfig });
     const simplifiedResponses = responses.map(r => ({
         score: r.aiScore,
         feedback: r.aiFeedback

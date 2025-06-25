@@ -60,6 +60,12 @@ const InstructionsPage = ({ onBegin }) => {
                         <Typography sx={{ color: '#FFE066', fontWeight: 700, fontSize: '1.2rem', minWidth: 24, fontFamily: 'inherit' }}>5.</Typography>
                         <Typography sx={{ fontSize: '1rem', fontFamily: 'inherit' }}>Please ensure you are in a quiet environment to allow for clear audio recording and accurate transcription.</Typography>
                     </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                        <Typography sx={{ color: '#FFE066', fontWeight: 700, fontSize: '1.2rem', minWidth: 24, fontFamily: 'inherit' }}>6.</Typography>
+                        <Typography sx={{ fontSize: '1rem', fontFamily: 'inherit', color: '#ff5252', fontWeight: 600 }}>
+                            If you receive 3 proctoring infractions (e.g., multiple faces, not facing the camera, or no face detected), your interview will be <b>terminated</b> and you will see a termination message.
+                        </Typography>
+                    </Box>
                 </Box>
                 <Box sx={{ mt: 6, textAlign: 'center' }}>
                     <Button

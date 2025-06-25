@@ -22,6 +22,14 @@ const createSession = async (req, res) => {
     });
 };
 
+// Helper to check if session is completed/terminated
+const checkSessionActive = (session) => {
+    if (!session) throw new AppError(404, 'Interview session not found.');
+    if (['completed', 'terminated'].includes(session.status)) {
+        throw new AppError(403, 'This interview session is already completed or terminated.');
+    }
+};
+
 const getSessionByLink = async (req, res) => {
     const { uniqueLink } = req.params;
     
@@ -32,10 +40,10 @@ const getSessionByLink = async (req, res) => {
     if (!session) {
         throw new AppError(404, 'Interview session not found. Please check your link.');
     }
-    
     if (session.candidate._id.toString() !== req.user._id.toString()) {
         throw new AppError(403, 'You are not authorized to start this interview session.');
     }
+    checkSessionActive(session);
 
     if (session.status === 'scheduled') {
         session.status = 'in_progress';
@@ -67,6 +75,8 @@ const submitResponse = async (req, res) => {
     const { sessionId } = req.params;
     const { questionId, transcribedText, audioFileUrl, duration } = req.body;
     const userId = req.user._id;
+    const session = await InterviewSession.findById(sessionId);
+    checkSessionActive(session);
 
     if (!questionId || !transcribedText || !audioFileUrl) {
         throw new AppError(400, 'questionId, transcribedText, and audioFileUrl are required.');
@@ -137,23 +147,25 @@ const getCompletedSessions = async (req, res) => {
  */
 const getSessionDetailsForAdmin = async (req, res) => {
     const { sessionId } = req.params;
-
     const session = await InterviewSession.findById(sessionId)
         .populate('template')
         .populate('candidate');
-    
     if (!session) {
         throw new AppError(404, 'Session not found.');
     }
-
-    // Unlike getSessionByLink, this returns the full question objects
-    // including idealAnswer and keywords for admin review.
     res.status(200).json({
         success: true,
         data: session,
     });
 };
 
+// Add endpoint to mark session as completed/terminated from proctoring backend
+const markSessionCompletedOrTerminated = async (req, res) => {
+    const { sessionId } = req.params;
+    const { terminated, terminationReason, proctoringInfractions, warningCount, proctoringEventLog } = req.body;
+    const session = await interviewService.markSessionCompletedOrTerminated({ sessionId, terminated, terminationReason, proctoringInfractions, warningCount, proctoringEventLog });
+    res.status(200).json({ success: true, data: session });
+};
 
 module.exports = {
     createSession,
@@ -163,4 +175,5 @@ module.exports = {
     getMySessions,
     getCompletedSessions,
     getSessionDetailsForAdmin,
+    markSessionCompletedOrTerminated,
 };

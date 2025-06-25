@@ -10,7 +10,7 @@ const SummaryPage = ({ reportData: report }) => {
         return <Box sx={{ textAlign: 'center', p: 12, color: '#bdbdbd', fontFamily: 'Inter, Roboto, Arial, sans-serif' }}>Report data is not available.</Box>;
     }
 
-    const { overallScore, recommendation, strengths, areasForImprovement, session } = report;
+    const { overallScore, recommendation, strengths, areasForImprovement, session, warningCount, proctoringInfractions, proctoringEventLog, terminationReason } = report;
     const { candidate, template } = session || {};
 
     let scoreColor = '#ff5252';
@@ -79,6 +79,36 @@ const SummaryPage = ({ reportData: report }) => {
                         </Box>
                     </Box>
                 </Box>
+                {/* Proctoring Analytics Section */}
+                {(warningCount > 0 || terminationReason || (proctoringInfractions && proctoringInfractions.length > 0)) && (
+                    <Box sx={{ mb: 5, background: '#232526', p: 3, borderRadius: 2, border: '1px solid #FFE066', fontFamily: 'inherit' }}>
+                        <Typography sx={{ fontWeight: 700, color: '#FFE066', mb: 1, fontFamily: 'inherit' }}>Proctoring Analytics</Typography>
+                        <Typography sx={{ color: '#bdbdbd', fontFamily: 'inherit' }}>Warnings Issued: <b style={{ color: warningCount >= 3 ? '#ff5252' : '#FFE066' }}>{warningCount}</b></Typography>
+                        {terminationReason && <Typography sx={{ color: '#ff5252', fontFamily: 'inherit' }}>Termination Reason: {terminationReason}</Typography>}
+                        {proctoringInfractions && proctoringInfractions.length > 0 && (
+                            <Box sx={{ mt: 1 }}>
+                                <Typography sx={{ color: '#bdbdbd', fontFamily: 'inherit' }}>Infractions:</Typography>
+                                <ul style={{ color: '#ffb2b2', marginLeft: 20 }}>
+                                    {proctoringInfractions.map((inf, idx) => (
+                                        <li key={idx}>{typeof inf === 'string' ? inf : JSON.stringify(inf)}</li>
+                                    ))}
+                                </ul>
+                            </Box>
+                        )}
+                        {proctoringEventLog && proctoringEventLog.length > 0 && (
+                            <details style={{ marginTop: 8 }}>
+                                <summary style={{ color: '#FFE066', cursor: 'pointer', fontWeight: 600 }}>View Proctoring Event Log</summary>
+                                <Box sx={{ mt: 1, maxHeight: 200, overflowY: 'auto', background: '#181818', borderRadius: 1, p: 2, fontSize: '0.95rem', color: '#bdbdbd', fontFamily: 'inherit' }}>
+                                    <ul style={{ paddingLeft: 16 }}>
+                                        {proctoringEventLog.map((event, idx) => (
+                                            <li key={idx} style={{ marginBottom: 4 }}>{typeof event === 'string' ? event : JSON.stringify(event)}</li>
+                                        ))}
+                                    </ul>
+                                </Box>
+                            </details>
+                        )}
+                    </Box>
+                )}
             </Paper>
         </Box>
     );

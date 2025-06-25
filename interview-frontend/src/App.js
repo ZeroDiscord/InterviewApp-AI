@@ -10,12 +10,14 @@ import InterviewPage from './pages/InterviewPage';
 import DetailedReportPage from './pages/DetailedReportPage';
 import AdminPanel from './components/AdminPanel';
 import InterviewCompletedPage from './pages/InterviewCompletedPage';
+import ResourceCheckPage from './pages/ResourceCheckPage';
 
 function App() {
     const [user, setUser] = useState(null);
     const [appLoading, setAppLoading] = useState(true);
     const [path, setPath] = useState(window.location.pathname);
     const [error, setError] = useState('');
+    const [resourceCheckedFor, setResourceCheckedFor] = useState(null);
 
     useEffect(() => {
         const storedUser = JSON.parse(localStorage.getItem('user'));
@@ -45,6 +47,9 @@ function App() {
         const instructionsMatch = path.match(/^\/instructions\/([a-f0-9-]+)$/);
         if (instructionsMatch) {
             const uniqueLink = instructionsMatch[1];
+            if (resourceCheckedFor !== uniqueLink) {
+                return <ResourceCheckPage onSuccess={() => setResourceCheckedFor(uniqueLink)} />;
+            }
             return <InstructionsPage onBegin={() => setPath(`/interview/${uniqueLink}`)} />;
         }
 
@@ -85,21 +90,21 @@ function App() {
     };
     
     return (
-        <div className="bg-slate-50 font-sans min-h-screen">
-            <header className="bg-white/80 backdrop-blur-lg sticky top-0 z-10 shadow-sm">
+        <div className="bg-slate-900 font-sans min-h-screen">
+            <header className="sticky top-0 z-10 bg-gradient-to-r from-[#0d131f]/80 via-[#111827]/80 to-[#0d131f]/80 backdrop-blur-xl shadow-2xl border-b border-yellow-500/20">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center py-4">
-                        <h1 className="text-2xl font-bold text-slate-800 cursor-pointer hover:text-blue-600" onClick={() => user && setPath('/dashboard')}>
+                        <h1 className="text-2xl font-extrabold text-white tracking-tight cursor-pointer hover:text-yellow-400 transition duration-150" onClick={() => user && setPath('/dashboard')}>
                           AI Interview Portal
                         </h1>
                         {user && (
-                            <div>
+                            <div className="flex items-center gap-3">
                                 {user.role !== 'candidate' && (
-                                    <button onClick={() => setPath(path.startsWith('/admin') ? '/dashboard' : '/admin')} className="bg-slate-600 text-white px-4 py-2 rounded-lg hover:bg-slate-700 mr-4">
+                                    <button onClick={() => setPath(path.startsWith('/admin') ? '/dashboard' : '/admin')} className="px-4 py-2 rounded-lg border border-yellow-400 text-yellow-300 hover:bg-yellow-400 hover:text-slate-900 shadow-sm transition duration-150">
                                         {path.startsWith('/admin') ? 'Dashboard' : 'Admin Panel'}
                                     </button>
                                 )}
-                                <button onClick={handleLogout} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                                <button onClick={handleLogout} className="px-4 py-2 rounded-lg border border-red-500 text-red-400 hover:bg-red-500 hover:text-white shadow-sm transition duration-150">
                                   Logout
                                 </button>
                             </div>
@@ -108,12 +113,12 @@ function App() {
                 </div>
             </header>
             
-            <main className="p-4 md:p-8">
-                 {error && (
-                    <div className="max-w-4xl mx-auto bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-r-lg">
+            <main>
+                {error && (
+                    <div className="max-w-4xl mx-auto bg-red-900/50 border-l-4 border-red-500 text-red-200 p-4 mb-6 rounded-r-lg">
                         <p className="font-bold">Error</p><p>{error}</p>
                     </div>
-                 )}
+                )}
                 {renderContent()}
             </main>
         </div>

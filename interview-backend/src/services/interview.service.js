@@ -34,7 +34,7 @@ const createSessionFromTemplate = async ({ templateId, candidateId, interviewerI
 
 const submitResponse = async ({ sessionId, questionId, userId, responseData }) => {
     const session = await InterviewSession.findById(sessionId);
-    if (!session || session.status !== 'in_progress') {
+    if (!session || !['in_progress'].includes(session.status)) {
         throw new AppError(404, 'Active interview session not found or not in progress.');
     }
     if (session.candidate.toString() !== userId.toString()) {
@@ -83,14 +83,20 @@ const finalizeAndGenerateReport = async (sessionId) => {
     }
     const overallScore = responses.reduce((acc, r) => acc + (r.aiScore), 0) / responses.length;
     const aiSummary = await generateFinalReport(responses);
-    
+    // Fetch session for proctoring analytics
+    const session = await InterviewSession.findById(sessionId);
     const report = await InterviewReport.create({
         session: sessionId,
         overallScore: overallScore.toFixed(2),
         strengths: aiSummary.strengths,
         areasForImprovement: aiSummary.areasForImprovement,
         recommendation: aiSummary.recommendation,
-        detailedAnalysis: responses.map(r => ({ questionId: r.question, score: r.aiScore, feedback: r.aiFeedback }))
+        detailedAnalysis: responses.map(r => ({ questionId: r.question, score: r.aiScore, feedback: r.aiFeedback })),
+        // Proctoring analytics
+        warningCount: session.warningCount,
+        proctoringInfractions: session.proctoringInfractions,
+        proctoringEventLog: session.proctoringEventLog,
+        terminationReason: session.terminationReason,
     });
     return report;
 };
@@ -137,9 +143,28 @@ const getSessionResponses = async (sessionId, page, limit) => {
     };
 };
 
+const markSessionCompletedOrTerminated = async ({ sessionId, terminated, terminationReason, proctoringInfractions, warningCount, proctoringEventLog }) => {
+    const session = await InterviewSession.findById(sessionId);
+    if (!session) throw new AppError(404, 'Interview session not found.');
+    if (terminated) {
+        session.status = 'terminated';
+        session.terminationReason = terminationReason || 'Terminated by proctoring.';
+        session.completedAt = new Date();
+    } else {
+        session.status = 'completed';
+        session.completedAt = new Date();
+    }
+    if (Array.isArray(proctoringInfractions)) session.proctoringInfractions = proctoringInfractions;
+    if (typeof warningCount === 'number') session.warningCount = Math.min(warningCount, 3);
+    if (Array.isArray(proctoringEventLog)) session.proctoringEventLog = proctoringEventLog;
+    await session.save();
+    return session;
+};
+
 module.exports = {
     createSessionFromTemplate,
     submitResponse,
     finalizeAndGenerateReport,
     getSessionResponses,
+    markSessionCompletedOrTerminated,
 };

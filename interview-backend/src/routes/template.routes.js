@@ -4,7 +4,7 @@ const { createTemplate, getTemplates } = require('../controllers/template.contro
 const { protect, authorize } = require('../middleware/auth.middleware');
 const asyncHandler = require('../middleware/asyncHandler');
 
-const ROLES = ['admin', 'interviewer', 'hr_manager'];
+const ROLES = ['admin', 'interviewer', 'hr_manager', 'ml_engineer'];
 
 /**
  * @route   POST /api/templates

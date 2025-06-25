@@ -186,10 +186,29 @@ const AdminPanel = ({ onViewReport }) => {
                                         onChange={handleUserInputChange}
                                         required
                                         disableUnderline
-                                        sx={{ color: '#fff', fontFamily: 'inherit', '.MuiSelect-filled': { bgcolor: '#232526' } }}
+                                        sx={{ 
+                                            color: '#bdbdbd', 
+                                            fontFamily: 'inherit', 
+                                            '.MuiSelect-filled': { bgcolor: '#232526' },
+                                            '& .MuiSelect-icon': { color: '#bdbdbd' }
+                                        }}
+                                        MenuProps={{
+                                            PaperProps: {
+                                                sx: {
+                                                    bgcolor: '#181818',
+                                                    color: '#fff',
+                                                    '& .MuiMenuItem-root': {
+                                                        bgcolor: '#181818',
+                                                        '&:hover': { bgcolor: '#2a2a2a' },
+                                                    },
+                                                },
+                                            },
+                                        }}
                                     >
-                                        <MenuItem value="candidate" sx={{ fontFamily: 'inherit' }}>Candidate</MenuItem>
-                                        <MenuItem value="interviewer" sx={{ fontFamily: 'inherit' }}>Interviewer</MenuItem>
+                                        <MenuItem value="candidate" sx={{ fontFamily: 'inherit', color: '#fff', bgcolor: '#232526', '&:hover': { bgcolor: '#2a2a2a' } }}>Candidate</MenuItem>
+                                        <MenuItem value="interviewer" sx={{ fontFamily: 'inherit', color: '#fff', bgcolor: '#232526', '&:hover': { bgcolor: '#2a2a2a' } }}>Interviewer</MenuItem>
+                                        <MenuItem value="ml_engineer" sx={{ fontFamily: 'inherit', color: '#fff', bgcolor: '#232526', '&:hover': { bgcolor: '#2a2a2a' } }}>ML Engineer</MenuItem>
+                                        <MenuItem value="hr_manager" sx={{ fontFamily: 'inherit', color: '#fff', bgcolor: '#232526', '&:hover': { bgcolor: '#2a2a2a' } }}>HR Manager</MenuItem>
                                     </Select>
                                 </FormControl>
                                 <Button

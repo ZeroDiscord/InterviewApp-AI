@@ -66,43 +66,48 @@ const CandidateDashboard = ({ user }) => {
                                 <Box>
                                     <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: '#FFE066', fontFamily: 'inherit' }}>{session.template.title}</Typography>
                                     <Typography sx={{ color: '#bdbdbd', fontFamily: 'inherit', mt: 0.5 }}>
-                                        Status: <span style={{ fontWeight: 600, color: '#fff', textTransform: 'capitalize' }}>{session.status.replace('_', ' ')}</span>
+                                        Status: {session.status === 'terminated' ? (
+                                            <span style={{ fontWeight: 700, color: '#ff5252', textTransform: 'capitalize', border: '1.5px solid #ff5252', borderRadius: 6, padding: '2px 10px', marginLeft: 6 }}>Terminated</span>
+                                        ) : session.status === 'completed' ? (
+                                            <span style={{ fontWeight: 700, color: '#4caf50', textTransform: 'capitalize', border: '1.5px solid #4caf50', borderRadius: 6, padding: '2px 10px', marginLeft: 6 }}>Completed</span>
+                                        ) : (
+                                            <span style={{ fontWeight: 600, color: '#fff', textTransform: 'capitalize' }}>{session.status.replace('_', ' ')}</span>
+                                        )}
                                     </Typography>
                                     <Typography sx={{ color: '#bdbdbd', fontFamily: 'inherit', mt: 0.5 }}>
                                         Scheduled for: {new Date(session.scheduledAt).toLocaleString()}
                                     </Typography>
                                 </Box>
-                                <Button
-                                    onClick={() => handleStartInterview(session.uniqueLink)}
-                                    disabled={session.status !== 'scheduled'}
-                                    variant="outlined"
-                                    sx={{
-                                        color: '#FFE066',
-                                        borderColor: '#FFE066',
-                                        borderWidth: 2,
-                                        borderRadius: 1.5,
-                                        py: 1.2,
-                                        px: 4,
-                                        minWidth: '160px',
-                                        fontSize: '1rem',
-                                        fontWeight: 700,
-                                        letterSpacing: 1,
-                                        fontFamily: 'inherit',
-                                        boxShadow: 'none',
-                                        transition: 'all 0.2s',
-                                        background: 'transparent',
-                                        '&:hover': {
-                                            backgroundColor: '#FFE066',
-                                            color: '#181818',
+                                {session.status === 'scheduled' && (
+                                    <Button
+                                        onClick={() => handleStartInterview(session.uniqueLink)}
+                                        variant="outlined"
+                                        sx={{
+                                            color: '#FFE066',
                                             borderColor: '#FFE066',
-                                            boxShadow: '0 0 16px 0 #ffe06644',
-                                        },
-                                        opacity: session.status !== 'scheduled' ? 0.5 : 1,
-                                        cursor: session.status !== 'scheduled' ? 'not-allowed' : 'pointer',
-                                    }}
-                                >
-                                    {session.status === 'scheduled' ? 'Start Interview' : 'View Status'}
-                                </Button>
+                                            borderWidth: 2,
+                                            borderRadius: 1.5,
+                                            py: 1.2,
+                                            px: 4,
+                                            minWidth: '160px',
+                                            fontSize: '1rem',
+                                            fontWeight: 700,
+                                            letterSpacing: 1,
+                                            fontFamily: 'inherit',
+                                            boxShadow: 'none',
+                                            transition: 'all 0.2s',
+                                            background: 'transparent',
+                                            '&:hover': {
+                                                backgroundColor: '#FFE066',
+                                                color: '#181818',
+                                                borderColor: '#FFE066',
+                                                boxShadow: '0 0 16px 0 #ffe06644',
+                                            },
+                                        }}
+                                    >
+                                        Start Interview
+                                    </Button>
+                                )}
                             </Paper>
                         ))
                     ) : (

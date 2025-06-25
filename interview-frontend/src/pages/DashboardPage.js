@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as apiClient from '../services/apiClient';
-import { Box, Typography, Paper, Button, Alert } from '@mui/material';
+import {
+    Box, Typography, Paper, Button, Alert, CircularProgress, Stepper, Step, StepLabel,
+    TextField, Select, MenuItem, FormControl, InputLabel
+} from '@mui/material';
+import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 const loadingMessages = [
     "Contacting AI for analysis...",
@@ -11,59 +16,86 @@ const loadingMessages = [
     "Almost there..."
 ];
 
-/**
- * The main dashboard for authenticated users, particularly for roles that create interviews.
- * Fetches available templates and candidates and provides a form to schedule a new interview session.
- */
-const DashboardPage = () => {
-    // State for the form
+const AnimatedLoadingText = ({ message }) => {
+    const [dots, setDots] = useState('');
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setDots(prev => prev.length < 3 ? prev + '.' : '');
+        }, 500);
+        return () => clearInterval(interval);
+    }, []);
+    return (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, fontWeight: 700, color: '#181818', fontSize: '1.1rem', letterSpacing: 1 }}>
+            {message}
+            <span style={{ fontSize: '1.5rem', fontWeight: 900 }}>{dots}</span>
+        </Box>
+    );
+};
+
+const getInitialTime = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 1);
+    return now;
+};
+
+const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
     const [selectedTemplate, setSelectedTemplate] = useState('');
     const [selectedCandidate, setSelectedCandidate] = useState('');
-    const [scheduledAt, setScheduledAt] = useState(new Date().toISOString().slice(0, 16));
-
-    // State for data fetched from the backend
-    const [templates, setTemplates] = useState([]);
-    const [candidates, setCandidates] = useState([]);
-    
-    // --- Richer UI state ---
+    const [scheduledDate, setScheduledDate] = useState(new Date());
+    const [scheduledTime, setScheduledTime] = useState(getInitialTime());
+    const [minTime, setMinTime] = useState(getInitialTime());
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('Scheduling...');
     const [error, setError] = useState('');
     const [successInfo, setSuccessInfo] = useState(null);
-
     const loadingIntervalRef = useRef(null);
+    const steps = ['Template', 'Candidate', 'Time', 'Confirm'];
+    const [activeStep, setActiveStep] = useState(0);
 
-    // --- Cleanup interval on unmount ---
-    useEffect(() => {
-        return () => {
-            if (loadingIntervalRef.current) {
-                clearInterval(loadingIntervalRef.current);
-            }
-        };
-    }, []);
+    const handleNext = () => setActiveStep((prev) => Math.min(prev + 1, steps.length - 1));
+    const handleBack = () => setActiveStep((prev) => Math.max(prev - 1, 0));
 
-    // Fetch initial data for dropdowns
+    const getScheduledAt = () => {
+        if (!scheduledDate || !scheduledTime) return '';
+        const date = new Date(scheduledDate);
+        date.setHours(scheduledTime.getHours());
+        date.setMinutes(scheduledTime.getMinutes());
+        date.setSeconds(0);
+        date.setMilliseconds(0);
+        return date.toISOString();
+    };
+
     useEffect(() => {
-        const fetchData = async () => {
-            setIsLoading(true);
-            try {
-                const templatesResponse = await apiClient.getTemplates();
-                const candidatesResponse = await apiClient.getCandidates();
-                setTemplates(templatesResponse.data || []);
-                setCandidates(candidatesResponse.data || []);
-            } catch (err) {
-                setError('Failed to fetch initial data. Please try again later.');
-            } finally {
-                setIsLoading(false);
+        const today = new Date();
+        const selected = new Date(scheduledDate);
+        
+        const isSameDay = today.getFullYear() === selected.getFullYear() &&
+                          today.getMonth() === selected.getMonth() &&
+                          today.getDate() === selected.getDate();
+
+        if (isSameDay) {
+            const newMinTime = new Date();
+            newMinTime.setMinutes(newMinTime.getMinutes()); // Set min time to now
+            setMinTime(newMinTime);
+            // If the currently scheduled time is now in the past, reset it
+            if (scheduledTime < newMinTime) {
+                setScheduledTime(newMinTime);
             }
-        };
-        fetchData();
-    }, []);
+        } else {
+            // If it's a future date, there's no minimum time for that day
+            setMinTime(null);
+        }
+    }, [scheduledDate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!selectedTemplate || !selectedCandidate) {
             setError('Please select a template and a candidate.');
+            return;
+        }
+        const scheduledAt = getScheduledAt();
+        if (new Date(scheduledAt) < new Date()) {
+            setError('Error: Scheduled date and time cannot be in the past.');
             return;
         }
         setIsLoading(true);
@@ -88,6 +120,8 @@ const DashboardPage = () => {
             });
             setSelectedTemplate('');
             setSelectedCandidate('');
+            setActiveStep(steps.length);
+            if (onCreate) onCreate();
         } catch (err) {
             setError(err.message || 'Failed to schedule interview.');
         } finally {
@@ -95,6 +129,228 @@ const DashboardPage = () => {
             setIsLoading(false);
         }
     };
+
+    const formControlStyles = {
+        '& .MuiInputLabel-root': { 
+            color: '#bdbdbd',
+            fontWeight: 500,
+        },
+        '& .MuiInputLabel-root.Mui-focused': { 
+            color: '#FFE066',
+        },
+        '& .MuiOutlinedInput-root': {
+            borderRadius: 2,
+            '& input': {
+                color: '#fff',
+            },
+            '& fieldset': {
+                borderColor: '#444',
+            },
+            '&:hover fieldset': {
+                borderColor: '#666',
+            },
+            '&.Mui-focused fieldset': {
+                borderColor: '#FFE066',
+                borderWidth: '2px',
+            },
+            '&.Mui-error fieldset': {
+                borderColor: '#ff5252',
+            },
+        },
+        '& .MuiSvgIcon-root': {
+            color: '#bdbdbd',
+        },
+        '& .MuiInputLabel-root.Mui-error': {
+            color: '#ff5252',
+        },
+        '& .MuiSelect-select': {
+            color: '#bdbdbd',
+        },
+    };
+
+    return (
+        <Paper elevation={4} sx={{
+            p: { xs: 3, sm: 4 },
+            maxWidth: 520,
+            width: '100%',
+            mx: 'auto',
+            background: 'rgba(30, 30, 30, 0.9)',
+            backdropFilter: 'blur(10px)',
+            color: 'white',
+            borderRadius: 4,
+            fontFamily: 'Inter, Roboto, Arial, sans-serif',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+        }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: 'white', mb: 3, textAlign: 'center' }}>
+                Schedule Interview
+            </Typography>
+            
+            <Stepper
+                activeStep={activeStep}
+                alternativeLabel
+                sx={{
+                    mb: 4,
+                    '.MuiStepLabel-label': {
+                        color: '#fff',
+                        fontWeight: 700,
+                        fontSize: '1.1rem',
+                        opacity: 1,
+                    },
+                    '.MuiStepIcon-root': {
+                        color: '#bdbdbd', // default (upcoming)
+                        '&.Mui-active': {
+                            color: '#FFE066', // active step icon color (yellow)
+                        },
+                        '&.Mui-completed': {
+                            color: '#4caf50', // completed step icon color (green)
+                        },
+                    },
+                    '.MuiStepLabel-label.Mui-active': {
+                        color: '#FFE066', // active step label color
+                        fontWeight: 900,
+                        textShadow: '0 2px 8px #181818',
+                    },
+                    '.MuiStepLabel-label.Mui-completed': {
+                        color: '#4caf50', // completed step label color
+                    },
+                }}
+            >
+                {steps.map((label, idx) => (
+                    <Step key={label} completed={activeStep > idx}>
+                        <StepLabel>{label}</StepLabel>
+                    </Step>
+                ))}
+            </Stepper>
+            {error && <Alert severity="error" sx={{ width: '100%', mb: 2, fontFamily: 'inherit' }}>{error}</Alert>}
+            {successInfo && (
+                <Alert severity="success" sx={{ width: '100%', mb: 2, fontFamily: 'inherit' }}>
+                    <strong>{successInfo.message}</strong>
+                    <br />
+                    <span>Shareable Link: <a href={successInfo.link} target="_blank" rel="noopener noreferrer" style={{ color: '#FFE066', textDecoration: 'underline', wordBreak: 'break-all', fontFamily: 'inherit' }}>{successInfo.link}</a></span>
+                </Alert>
+            )}
+            <form onSubmit={handleSubmit} autoComplete="off">
+                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <FormControl fullWidth sx={formControlStyles}>
+                            <InputLabel id="template-label">Interview Template</InputLabel>
+                            <Select
+                                labelId="template-label"
+                                label="Interview Template"
+                                value={selectedTemplate}
+                                onChange={(e) => { setSelectedTemplate(e.target.value); setActiveStep(1); }}
+                                required
+                            >
+                                {templates.map(template => (
+                                    <MenuItem key={template._id} value={template._id}>{template.title}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        
+                        <FormControl fullWidth sx={formControlStyles}>
+                            <InputLabel id="candidate-label">Candidate</InputLabel>
+                            <Select
+                                labelId="candidate-label"
+                                label="Candidate"
+                                value={selectedCandidate}
+                                onChange={(e) => { setSelectedCandidate(e.target.value); setActiveStep(2); }}
+                                required
+                            >
+                                {candidates.map(candidate => (
+                                    <MenuItem key={candidate._id} value={candidate._id}>
+                                        {`${candidate.firstName} ${candidate.lastName} (${candidate.email})`}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        
+                        <DatePicker
+                            label="Scheduled Date"
+                            value={scheduledDate}
+                            onChange={(newValue) => { setScheduledDate(newValue); setActiveStep(3); }}
+                            disablePast
+                            sx={{
+                                ...formControlStyles,
+                                '& .MuiOutlinedInput-input': { color: '#bdbdbd' },
+                                '& .MuiInputBase-input': { color: '#bdbdbd' },
+                                '& input': { color: '#bdbdbd' },
+                                '& .MuiPickersInputBase-sectionContent': { color: '#bdbdbd' },
+                                '& .MuiPickersSectionList-sectionContent': { color: '#bdbdbd' },
+                                '& .MuiPickersSectionList-sectionBefore': { color: '#bdbdbd' },
+                                '& .MuiPickersSectionList-sectionAfter': { color: '#bdbdbd' },
+                                '& .MuiPickersSectionList-sectionSeparator': { color: '#bdbdbd' },
+                            }}
+                            slotProps={{ textField: { fullWidth: true } }}
+                        />
+                        
+                        <TimePicker
+                            label="Scheduled Time"
+                            value={scheduledTime}
+                            onChange={(newValue) => { setScheduledTime(newValue); setActiveStep(3); }}
+                            minutesStep={5}
+                            sx={{
+                                ...formControlStyles,
+                                '& .MuiOutlinedInput-input': { color: '#bdbdbd' },
+                                '& .MuiInputBase-input': { color: '#bdbdbd' },
+                                '& input': { color: '#bdbdbd' },
+                                '& .MuiPickersInputBase-sectionContent': { color: '#bdbdbd' },
+                                '& .MuiPickersSectionList-sectionContent': { color: '#bdbdbd' },
+                                '& .MuiPickersSectionList-sectionBefore': { color: '#bdbdbd' },
+                                '& .MuiPickersSectionList-sectionAfter': { color: '#bdbdbd' },
+                                '& .MuiPickersSectionList-sectionSeparator': { color: '#bdbdbd' },
+                            }}
+                            slotProps={{ textField: { fullWidth: true } }}
+                        />
+
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={isLoading}
+                            fullWidth
+                            sx={{
+                                bgcolor: '#FFE066',
+                                color: '#181818',
+                                fontWeight: 700,
+                                fontSize: '1.1rem',
+                                borderRadius: 2,
+                                py: 1.5,
+                                mt: 2,
+                                '&:hover': { bgcolor: '#FFD700' },
+                            }}
+                        >
+                            {isLoading ? "Scheduling..." : 'Create Interview'}
+                        </Button>
+                    </Box>
+                </LocalizationProvider>
+            </form>
+        </Paper>
+    );
+};
+
+/**
+ * The main dashboard for authenticated users, particularly for roles that create interviews.
+ * Fetches available templates and candidates and provides a form to schedule a new interview session.
+ */
+const DashboardPage = () => {
+    const [templates, setTemplates] = useState([]);
+    const [candidates, setCandidates] = useState([]);
+    const [refresh, setRefresh] = useState(false);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [templatesRes, candidatesRes] = await Promise.all([
+                    apiClient.getTemplates(),
+                    apiClient.getCandidates()
+                ]);
+                setTemplates(templatesRes.data);
+                setCandidates(candidatesRes.data);
+            } catch (err) {
+                // handle error
+            }
+        };
+        fetchData();
+    }, [refresh]);
 
     return (
         <Box
@@ -108,144 +364,7 @@ const DashboardPage = () => {
                 fontFamily: 'Inter, Roboto, Arial, sans-serif',
             }}
         >
-            <Paper
-                elevation={3}
-                sx={{
-                    p: { xs: 2, sm: 5 },
-                    maxWidth: 520,
-                    width: '100%',
-                    mx: 2,
-                    background: 'rgba(24, 24, 24, 0.98)',
-                    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
-                    color: '#fff',
-                    borderRadius: 3,
-                    fontFamily: 'Inter, Roboto, Arial, sans-serif',
-                }}
-            >
-                <Typography variant="h4" sx={{ fontWeight: 700, color: '#fff', mb: 1, textAlign: 'center', fontFamily: 'inherit', letterSpacing: 0.5 }}>
-                    Schedule Interview
-                </Typography>
-                <Typography variant="subtitle1" sx={{ color: '#bdbdbd', fontWeight: 400, mb: 3, textAlign: 'center', fontFamily: 'inherit' }}>
-                    Select a template, candidate, and time to schedule a new interview
-                </Typography>
-                {error && <Alert severity="error" sx={{ width: '100%', mb: 2, fontFamily: 'inherit' }}>{error}</Alert>}
-                {successInfo && (
-                    <Alert severity="success" sx={{ width: '100%', mb: 2, fontFamily: 'inherit' }}>
-                        <strong>{successInfo.message}</strong>
-                        <br />
-                        <span>Shareable Link: <a href={successInfo.link} target="_blank" rel="noopener noreferrer" style={{ color: '#FFE066', textDecoration: 'underline', wordBreak: 'break-all', fontFamily: 'inherit' }}>{successInfo.link}</a></span>
-                    </Alert>
-                )}
-                <form onSubmit={handleSubmit} autoComplete="off">
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
-                        <Box>
-                            <Typography sx={{ color: '#bdbdbd', fontWeight: 500, mb: 1, fontSize: '1rem', fontFamily: 'inherit' }}>Interview Template</Typography>
-                            <select
-                                id="template"
-                                value={selectedTemplate}
-                                onChange={(e) => setSelectedTemplate(e.target.value)}
-                                required
-                                style={{
-                                    width: '100%',
-                                    padding: '14px 16px',
-                                    borderRadius: '6px',
-                                    background: '#232526',
-                                    color: '#fff',
-                                    border: 'none',
-                                    fontSize: '1rem',
-                                    fontFamily: 'inherit',
-                                    marginBottom: 0,
-                                    outline: 'none',
-                                    boxShadow: 'none',
-                                }}
-                            >
-                                <option value="" disabled>Select a template...</option>
-                                {templates.map(template => (
-                                    <option key={template._id} value={template._id} style={{ color: '#181818', fontFamily: 'inherit' }}>{template.title}</option>
-                                ))}
-                            </select>
-                        </Box>
-                        <Box>
-                            <Typography sx={{ color: '#bdbdbd', fontWeight: 500, mb: 1, fontSize: '1rem', fontFamily: 'inherit' }}>Candidate</Typography>
-                            <select
-                                id="candidate"
-                                value={selectedCandidate}
-                                onChange={(e) => setSelectedCandidate(e.target.value)}
-                                required
-                                style={{
-                                    width: '100%',
-                                    padding: '14px 16px',
-                                    borderRadius: '6px',
-                                    background: '#232526',
-                                    color: '#fff',
-                                    border: 'none',
-                                    fontSize: '1rem',
-                                    fontFamily: 'inherit',
-                                    marginBottom: 0,
-                                    outline: 'none',
-                                    boxShadow: 'none',
-                                }}
-                            >
-                                <option value="" disabled>Select a candidate...</option>
-                                {candidates.map(candidate => (
-                                    <option key={candidate._id} value={candidate._id} style={{ color: '#181818', fontFamily: 'inherit' }}>{`${candidate.firstName} ${candidate.lastName} (${candidate.email})`}</option>
-                                ))}
-                            </select>
-                        </Box>
-                        <Box>
-                            <Typography sx={{ color: '#bdbdbd', fontWeight: 500, mb: 1, fontSize: '1rem', fontFamily: 'inherit' }}>Scheduled Time</Typography>
-                            <input
-                                type="datetime-local"
-                                id="scheduledAt"
-                                value={scheduledAt}
-                                onChange={(e) => setScheduledAt(e.target.value)}
-                                required
-                                style={{
-                                    width: '100%',
-                                    padding: '14px 16px',
-                                    borderRadius: '6px',
-                                    background: '#232526',
-                                    color: '#fff',
-                                    border: 'none',
-                                    fontSize: '1rem',
-                                    fontFamily: 'inherit',
-                                    outline: 'none',
-                                    boxShadow: 'none',
-                                }}
-                            />
-                        </Box>
-                        <Button
-                            type="submit"
-                            variant="outlined"
-                            sx={{
-                                color: '#FFE066',
-                                borderColor: '#FFE066',
-                                borderWidth: 2,
-                                borderRadius: 1.5,
-                                py: 1.5,
-                                px: 0,
-                                minWidth: '160px',
-                                fontSize: '1.1rem',
-                                fontWeight: 700,
-                                alignSelf: 'center',
-                                letterSpacing: 1,
-                                fontFamily: 'inherit',
-                                boxShadow: 'none',
-                                transition: 'all 0.2s',
-                                '&:hover': {
-                                    backgroundColor: '#FFE066',
-                                    color: '#181818',
-                                    borderColor: '#FFE066',
-                                    boxShadow: '0 0 16px 0 #ffe06644',
-                                },
-                            }}
-                            disabled={isLoading}
-                        >
-                            {isLoading ? loadingMessage : 'SIGN IN'}
-                        </Button>
-                    </Box>
-                </form>
-            </Paper>
+            <CreateInterviewForm templates={templates} candidates={candidates} onCreate={() => setRefresh(r => !r)} />
         </Box>
     );
 };

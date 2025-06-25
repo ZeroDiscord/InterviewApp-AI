@@ -73,3 +73,6 @@ export const getSessionDetailsForAdmin = (sessionId) => request(`/interview/sess
 export const getSessionResponses = (sessionId, page = 1) => request(`/reports/${sessionId}/responses?page=${page}`);
 export const generateReport = (sessionId) => request(`/reports/${sessionId}`, { method: 'POST' });
 export const getReport = (sessionId) => request(`/reports/${sessionId}`);
+
+export const markSessionCompletedOrTerminated = (sessionId, data) =>
+  request(`/interview/sessions/${sessionId}/complete`, { method: 'POST', body: JSON.stringify(data) });

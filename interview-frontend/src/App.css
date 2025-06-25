@@ -1,3 +1,10 @@
+body, html, #root, .App {
+  box-shadow: none !important;
+  border: none !important;
+  outline: none !important;
+  background: none !important;
+}
+
 .App {
   text-align: center;
 }
@@ -34,5 +41,29 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Modern border glow for self-view correction window */
+.selfview-glow {
+  box-shadow: 0 0 0 4px #ffe06688, 0 0 32px 8px #ff525288;
+  animation: glow-pulse 1.2s infinite alternate;
+}
+@keyframes glow-pulse {
+  from { box-shadow: 0 0 0 4px #ffe06688, 0 0 32px 8px #ff525200; }
+  to   { box-shadow: 0 0 0 8px #ffe066cc, 0 0 48px 16px #ff5252cc; }
+}
+
+/* Modern timer drop shadow */
+.timer-shadow {
+  filter: drop-shadow(0 2px 12px #ffe06644);
+}
+
+/* Responsive self-view */
+@media (max-width: 600px) {
+  .modern-selfview {
+    min-width: 90vw !important;
+    max-width: 98vw !important;
+    height: auto !important;
   }
 }

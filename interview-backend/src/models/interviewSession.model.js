@@ -92,7 +92,7 @@ const interviewSessionSchema = new mongoose.Schema({
     // Current status of the interview session.
     status: {
         type: String,
-        enum: ['scheduled', 'in_progress', 'completed', 'cancelled', 'no_show'],
+        enum: ['scheduled', 'in_progress', 'completed', 'cancelled', 'no_show', 'terminated'],
         default: 'scheduled'
     },
     // Final score, to be calculated upon completion.
@@ -103,6 +103,23 @@ const interviewSessionSchema = new mongoose.Schema({
     notes: {
         type: String,
         trim: true
+    },
+    // Proctoring/termination fields
+    terminationReason: {
+        type: String,
+        default: null
+    },
+    proctoringInfractions: {
+        type: [mongoose.Schema.Types.Mixed],
+        default: []
+    },
+    warningCount: {
+        type: Number,
+        default: 0
+    },
+    proctoringEventLog: {
+        type: [mongoose.Schema.Types.Mixed],
+        default: []
     },
 }, {
     timestamps: true

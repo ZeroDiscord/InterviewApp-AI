@@ -13,7 +13,8 @@ const {
     submitResponse, 
     getMySessions,
     getCompletedSessions,
-    getSessionDetailsForAdmin
+    getSessionDetailsForAdmin,
+    markSessionCompletedOrTerminated
 } = require('../controllers/interview.controller');
 
 const config = require('../config');
@@ -64,6 +65,9 @@ router.get(
     authorize('admin', 'interviewer', 'hr_manager'),
     asyncHandler(getSessionDetailsForAdmin)
 );
+
+// Add route for marking session as completed/terminated
+router.post('/sessions/:sessionId/complete', protect, asyncHandler(markSessionCompletedOrTerminated));
 
 // This dynamic route must be last to avoid catching specific routes like '/completed' or '/details'
 router.get('/sessions/:uniqueLink', protect, asyncHandler(getSessionByLink));
