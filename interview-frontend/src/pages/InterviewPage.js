@@ -361,22 +361,23 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
 
     useEffect(() => {
         let interval;
-        setLoadingError(null);
         if (mediaStream && videoRef.current && sessionData) {
             interval = setInterval(async () => {
-                const video = videoRef.current;
-                if (!video || !video.videoWidth || !video.videoHeight) return;
+                if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) {
+                    return; // Don't proctor if video isn't playing
+                }
                 const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+                canvas.width = videoRef.current.videoWidth;
+                canvas.height = videoRef.current.videoHeight;
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const dataUrl = canvas.toDataURL('image/jpeg');
+                ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+                const imageData = canvas.toDataURL('image/jpeg', 0.7);
+
                 try {
                     const res = await fetch('http://localhost:5001/proctor', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ image: dataUrl, session_id: sessionData._id, question_index: currentQuestionIndex, answers: interviewProgress.answers })
+                        body: JSON.stringify({ image: imageData, session_id: sessionData._id }),
                     });
                     const result = await res.json();
                     setWarningCount(result.warning_count);
@@ -464,12 +465,12 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                 } catch (err) {
                     setLoadingError('Camera or proctoring service failed to load. Please check your connection and refresh.');
                 }
-            }, 500);
+            }, 1500); // Increased interval from 100ms to 1500ms
         }
         return () => {
-            clearInterval(interval);
+            if (interval) clearInterval(interval);
         };
-    }, [mediaStream, sessionData, currentQuestionIndex, interviewProgress]);
+    }, [mediaStream, sessionData, videoHasPlayed]);
 
     useEffect(() => {
         if ((terminated || interviewEnded) && sessionData && sessionData._id) {

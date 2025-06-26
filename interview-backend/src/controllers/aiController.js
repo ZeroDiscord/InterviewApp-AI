@@ -19,7 +19,7 @@ const answerAnalysisConfig = {
 
 async function generateInterviewFromJD(jobDescription, numberOfQuestions) {
   console.log(`Generating ${numberOfQuestions} questions with creative config...`);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: questionGenerationConfig });
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: questionGenerationConfig });
   const prompt = `
     You are an expert technical recruiter. Your task is to create a structured interview based on the provided job description.
     Generate exactly ${numberOfQuestions} diverse questions.
@@ -82,7 +82,7 @@ const processAnswer = async (userTranscription, questionDetails) => {
 };
 
 async function getSemanticConceptAnalysis(userAnswer, keyConcepts) {
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: answerAnalysisConfig });
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: answerAnalysisConfig });
   const prompt = `
     You are a precise AI teaching assistant. Your only job is to determine which of the provided "Key Concepts" are semantically present in the "User's Answer".
     Your entire response must be ONLY the required JSON object, without any markdown.
@@ -96,24 +96,61 @@ async function getSemanticConceptAnalysis(userAnswer, keyConcepts) {
 }
 
 async function generateFinalReport(responses) {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: answerAnalysisConfig });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: answerAnalysisConfig });
     const simplifiedResponses = responses.map(r => ({
+        question: r.questionText, // Including question text for better context
         score: r.aiScore,
-        feedback: r.aiFeedback
+        feedback: r.aiFeedback,
+        transcribedText: r.transcribedText, // The candidate's actual answer
     }));
     
     const prompt = `
-        You are an expert HR manager analyzing an interview. Based on the following scores and feedback snippets for each question, provide a final summary.
-        Scores are out of 100.
-        Your entire response must be ONLY a valid JSON object with three keys:
-        1. "strengths": An array of strings ([String]) summarizing the candidate's key strengths.
-        2. "areasForImprovement": An array of strings ([String]) listing concrete areas for improvement.
-        3. "recommendation": A single string, which must be one of 'strong_hire', 'hire', 'maybe', or 'no_hire'.
+        You are an expert HR analyst and technical interviewer. Your task is to provide a comprehensive and detailed evaluation of a candidate based on their interview responses.
+        Analyze the provided interview data, which includes the question, the candidate's transcribed answer, the score (out of 100), and AI-generated feedback for each response.
 
-        Interview Data:
+        Your entire response MUST be a single, valid JSON object, with no surrounding text or markdown.
+        The JSON object must have the following structure and keys:
+
+        {
+          "strengths": [
+            "A bulleted list of 3-4 key strengths demonstrated by the candidate."
+          ],
+          "areasForImprovement": [
+            "A bulleted list of 3-4 concrete areas where the candidate can improve."
+          ],
+          "recommendation": "A single string, which must be one of 'strong_hire', 'hire', 'maybe', or 'no_hire'.",
+          "skillScores": {
+            "technical": "A score (0-100) for overall technical proficiency.",
+            "communication": "A score (0-100) for clarity, and professional dialogue.",
+            "behavioral": "A score (0-100) assessing attitude and situational responses.",
+            "problemSolving": "A score (0-100) for analytical skills and solution approaches."
+          },
+          "detailedAnalysis": [
+            {
+              "skill": "Technical Knowledge",
+              "score": "Score (0-100) for this specific skill.",
+              "description": "A 1-2 sentence summary of their performance in this area."
+            },
+            {
+              "skill": "Subject Knowledge",
+              "score": "Score (0-100) for this specific skill.",
+              "description": "A 1-2 sentence summary of their performance in this area."
+            },
+            {
+              "skill": "Communication",
+              "score": "Score (0-100) for this specific skill.",
+              "description": "A 1-2 sentence summary of their performance in this area."
+            }
+          ],
+          "interviewSummary": "A concise, professional paragraph summarizing the candidate's overall performance.",
+          "feedback": "A constructive feedback paragraph for the candidate, highlighting both strengths and areas for growth.",
+          "recommendations": "A paragraph with actionable recommendations for the hiring manager (e.g., 'Strong hire for a mid-level role', 'Consider for a junior position', etc.)."
+        }
+
+        Here is the interview data:
         ${JSON.stringify(simplifiedResponses, null, 2)}
 
-        Provide a holistic summary in the required JSON format.
+        Now, provide the complete, structured evaluation in the required JSON format.
     `;
     const result = await model.generateContent(prompt);
     const text = result.response.text().replace(/```json\n|```/g, '').trim();

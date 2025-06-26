@@ -78,26 +78,46 @@ const submitResponse = async ({ sessionId, questionId, userId, responseData }) =
 };
 
 const finalizeAndGenerateReport = async (sessionId) => {
-    const responses = await InterviewResponse.find({ session: sessionId });
+    const responses = await InterviewResponse.find({ session: sessionId }).populate('question');
     if (responses.length === 0) {
         throw new AppError(400, 'Cannot generate a report for an interview with no responses.');
     }
-    const overallScore = responses.reduce((acc, r) => acc + (r.aiScore), 0) / responses.length;
-    const aiSummary = await generateFinalReport(responses);
+
+    const enrichedResponses = responses.map(r => ({
+        ...r.toObject(),
+        questionText: r.question.questionText // Ensure question text is available
+    }));
+
+    const overallScore = enrichedResponses.reduce((acc, r) => acc + (r.aiScore || 0), 0) / enrichedResponses.length;
+    
+    // Get the full, detailed report from the AI
+    const aiReportData = await generateFinalReport(enrichedResponses);
+
     // Fetch session for proctoring analytics
     const session = await InterviewSession.findById(sessionId);
+    
+    // The skillsDistribution for the radar chart needs to be a Map
+    const skillsDistribution = new Map(
+        aiReportData.detailedAnalysis.map(item => [item.skill, item.score])
+    );
+
+    // Create and save the report using data from the AI
     const report = await InterviewReport.create({
         session: sessionId,
-        overallScore: overallScore.toFixed(2),
-        strengths: aiSummary.strengths,
-        areasForImprovement: aiSummary.areasForImprovement,
-        recommendation: aiSummary.recommendation,
-        detailedAnalysis: responses.map(r => ({ questionId: r.question, score: r.aiScore, feedback: r.aiFeedback })),
-        // Proctoring analytics
-        warningCount: session.warningCount,
-        proctoringInfractions: session.proctoringInfractions,
-        proctoringEventLog: session.proctoringEventLog,
-        terminationReason: session.terminationReason,
+        overallScore,
+        recommendation: aiReportData.recommendation,
+        strengths: aiReportData.strengths,
+        areasForImprovement: aiReportData.areasForImprovement,
+        skillScores: aiReportData.skillScores,
+        detailedAnalysis: aiReportData.detailedAnalysis,
+        skillsDistribution, // Use the converted Map
+        interviewSummary: aiReportData.interviewSummary,
+        feedback: aiReportData.feedback,
+        recommendations: aiReportData.recommendations,
+        warningCount: session.warningCount || 0,
+        proctoringInfractions: session.proctoringInfractions || [],
+        proctoringEventLog: session.proctoringEventLog || [],
+        terminationReason: session.terminationReason || null,
     });
     return report;
 };

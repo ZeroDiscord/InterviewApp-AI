@@ -72,6 +72,27 @@ const interviewReportSchema = new mongoose.Schema({
         type: String,
         default: null
     },
+    // New Detailed Analytics Fields
+    skillScores: {
+        technical: { type: Number, min: 0, max: 100 },
+        communication: { type: Number, min: 0, max: 100 },
+        behavioral: { type: Number, min: 0, max: 100 },
+        problemSolving: { type: Number, min: 0, max: 100 },
+    },
+    detailedAnalysis: [
+        {
+            skill: String,
+            score: Number,
+            description: String,
+        },
+    ],
+    skillsDistribution: {
+        type: Map,
+        of: Number,
+    },
+    interviewSummary: { type: String, trim: true },
+    feedback: { type: String, trim: true },
+    recommendations: { type: String, trim: true },
 }, {
     timestamps: {
         createdAt: 'generatedAt',

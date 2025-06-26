@@ -7,6 +7,7 @@ const AdminPanel = ({ onViewReport }) => {
     const [templateData, setTemplateData] = useState({
         title: '',
         jobDescription: '',
+        numberOfQuestions: 5,
     });
 
     // State for creating a new user
@@ -50,17 +51,22 @@ const AdminPanel = ({ onViewReport }) => {
 
     const handleCreateTemplate = async (e) => {
         e.preventDefault();
-        setIsFormLoading(true); // FIX: Used correct setter name
+        setIsFormLoading(true);
         setError('');
         setSuccessMessage('');
+        if (!templateData.title || !templateData.jobDescription || !templateData.numberOfQuestions) {
+            setError('Please provide all required fields: title, jobDescription, and numberOfQuestions.');
+            setIsFormLoading(false);
+            return;
+        }
         try {
             await apiClient.createTemplate(templateData);
             setSuccessMessage(`Successfully created template: "${templateData.title}"!`);
-            setTemplateData({ title: '', jobDescription: '' });
+            setTemplateData({ title: '', jobDescription: '', numberOfQuestions: 5 });
         } catch (err) {
             setError(err.message || 'Failed to create template.');
         } finally {
-            setIsFormLoading(false); // FIX: Used correct setter name
+            setIsFormLoading(false);
         }
     };
 
@@ -248,7 +254,7 @@ const AdminPanel = ({ onViewReport }) => {
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                 <TextField
                                     name="title"
-                                    placeholder="Template Title"
+                                    placeholder="Template Title (e.g., 'Senior React Developer')"
                                     value={templateData.title}
                                     onChange={handleTemplateInputChange}
                                     required
@@ -263,11 +269,37 @@ const AdminPanel = ({ onViewReport }) => {
                                     onChange={handleTemplateInputChange}
                                     required
                                     multiline
-                                    minRows={6}
+                                    rows={8}
                                     variant="filled"
                                     InputProps={{ disableUnderline: true, sx: { bgcolor: '#232526', borderRadius: 1, color: '#fff' } }}
+                                    sx={{ '.MuiInputBase-input': { color: '#fff', px: 2, py: 1.5, fontFamily: 'inherit', resize: 'vertical' } }}
+                                />
+                                <TextField
+                                    name="numberOfQuestions"
+                                    label="Number of Questions"
+                                    value={templateData.numberOfQuestions}
+                                    onChange={handleTemplateInputChange}
+                                    required
+                                    type="number"
+                                    variant="outlined"
+                                    InputLabelProps={{
+                                        sx: { color: '#bdbdbd' }
+                                    }}
                                     sx={{
-                                        textarea: { color: '#fff', px: 2, py: 1.5, fontFamily: 'inherit' },
+                                        '& .MuiOutlinedInput-root': {
+                                            backgroundColor: '#232526',
+                                            borderRadius: 1,
+                                            '& fieldset': {
+                                                borderColor: 'transparent',
+                                            },
+                                            '&:hover fieldset': {
+                                                borderColor: 'transparent',
+                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderColor: 'transparent',
+                                            },
+                                        },
+                                        input: { color: '#fff', px: 2, py: 1.5, fontFamily: 'inherit' }
                                     }}
                                 />
                                 <Button
@@ -279,7 +311,7 @@ const AdminPanel = ({ onViewReport }) => {
                                         borderWidth: 2,
                                         borderRadius: 1.5,
                                         py: 1.5,
-                                        minWidth: '120px',
+                                        minWidth: '180px',
                                         fontSize: '1rem',
                                         fontWeight: 700,
                                         alignSelf: 'center',
