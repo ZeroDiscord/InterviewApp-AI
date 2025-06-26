@@ -4,8 +4,10 @@ const InterviewResponse = require('../models/interviewResponse.model');
 const InterviewReport = require('../models/interviewReport.model');
 const User = require('../models/user.model');
 const { generateInterviewFromJD, processAnswer, generateFinalReport } = require('../controllers/aiController');
-const { AppError } = require('../middleware/errorHandler');
+const AppError = require('../utils/AppError');
 const { sendReportEmail, sendDecisionEmail } = require('../utils/mail');
+const { Parser } = require('json2csv');
+const PDFDocument = require('pdfkit');
 
 const createSessionFromTemplate = async ({ templateId, candidateId, interviewerId, scheduledAt }) => {
     const template = await InterviewTemplate.findById(templateId);
@@ -229,6 +231,147 @@ const submitDecision = async ({ sessionId, decision, comments, adminId }) => {
     return session;
 };
 
+/**
+ * Export the report for an interview as CSV
+ * @param {string} sessionId
+ * @param {object} res - Express response object
+ */
+const exportReportCSV = async (sessionId, res) => {
+    // 1. Fetch the full report and session details
+    const report = await InterviewReport.findOne({ session: sessionId }).populate({
+        path: 'session',
+        populate: [
+            { path: 'candidate', select: 'firstName lastName email' },
+            { path: 'template', select: 'title' }
+        ]
+    });
+
+    if (!report) {
+        throw new AppError(404, 'Report not found.');
+    }
+
+    const session = await InterviewSession.findById(sessionId).lean();
+    if (!session) {
+        throw new AppError(404, 'Interview session not found.');
+    }
+
+    const responses = await InterviewResponse.find({ session: sessionId }).lean();
+
+    // 2. Define fields for the comprehensive report
+    const fields = [
+        'candidateName', 'candidateEmail', 'templateTitle', 'overallScore',
+        'technicalScore', 'communicationScore', 'problemSolvingScore', 'behavioralScore',
+        'interviewSummary', 'feedback',
+        'question', 'answer', 'aiScore', 'aiFeedback', 'keywordsMatched', 'durationSeconds'
+    ];
+
+    // 3. Map responses to a flat CSV structure
+    const data = responses.map(r => {
+        const candidate = report.session?.candidate || {};
+        const template = report.session?.template || {};
+        const question = session.questions.find(q => q._id.toString() === r.question.toString());
+        
+        return {
+            candidateName: `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim(),
+            candidateEmail: candidate.email || 'N/A',
+            templateTitle: template.title || 'N/A',
+            overallScore: report.overallScore,
+            technicalScore: report.skillScores?.technical || 0,
+            communicationScore: report.skillScores?.communication || 0,
+            problemSolvingScore: report.skillScores?.problemSolving || 0,
+            behavioralScore: report.skillScores?.behavioral || 0,
+            interviewSummary: report.interviewSummary,
+            feedback: report.feedback,
+            question: question?.questionText || 'Question text not found',
+            answer: r.transcribedText,
+            aiScore: r.aiScore,
+            aiFeedback: r.aiFeedback,
+            keywordsMatched: (r.keywordsMatched || []).join('; '),
+            durationSeconds: r.responseDurationSeconds,
+        };
+    });
+
+    // 4. Create and send CSV
+    const parser = new Parser({ fields });
+    const csv = parser.parse(data);
+    const candidateName = `${report.session?.candidate?.firstName || 'candidate'}_${report.session?.candidate?.lastName || 'report'}`;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=report_${candidateName}_${sessionId}.csv`);
+    res.status(200).send(csv);
+};
+
+/**
+ * Export the report for an interview as PDF
+ * @param {string} sessionId
+ * @param {object} res - Express response object
+ */
+const exportReportPDF = async (sessionId, res) => {
+    // Fetch report and session
+    const report = await InterviewReport.findOne({ session: sessionId }).populate({
+        path: 'session',
+        populate: [
+            { path: 'candidate', select: 'firstName lastName email' },
+            { path: 'template', select: 'title' }
+        ]
+    });
+    if (!report) throw new AppError(404, 'Report not found.');
+    
+    const session = await InterviewSession.findById(sessionId).lean();
+    if (!session) {
+        throw new AppError(404, 'Interview session not found.');
+    }
+
+    const responses = await InterviewResponse.find({ session: sessionId }).lean();
+    
+    const candidate = report.session?.candidate || {};
+    const template = report.session?.template || {};
+    const candidateName = `${candidate.firstName || 'candidate'}_${candidate.lastName || 'report'}`;
+
+    // Create PDF
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=report_${candidateName}_${sessionId}.pdf`);
+    doc.pipe(res);
+    // Title
+    doc.fontSize(22).fillColor('#222').text('Interview Report', { align: 'center' });
+    doc.moveDown();
+    // Candidate Info
+    doc.fontSize(14).fillColor('#333').text(`Candidate: ${candidate.firstName || ''} ${candidate.lastName || ''}`.trim());
+    doc.text(`Email: ${candidate.email || 'N/A'}`);
+    doc.text(`Template: ${template.title || 'N/A'}`);
+    doc.moveDown();
+    // Scores
+    doc.fontSize(16).fillColor('#222').text('Scores:', { underline: true });
+    Object.entries(report.skillScores || {}).forEach(([skill, score]) => {
+        doc.fontSize(12).fillColor('#333').text(`${skill}: ${score}`);
+    });
+    doc.fontSize(12).fillColor('#333').text(`Overall Score: ${report.overallScore}`);
+    doc.moveDown();
+    // Responses
+    doc.fontSize(16).fillColor('#222').text('Responses:', { underline: true });
+    responses.forEach((r, idx) => {
+        const question = session.questions.find(q => q._id.toString() === r.question.toString());
+        const questionText = question?.questionText || 'Question text not found';
+        doc.moveDown(0.5);
+        doc.fontSize(13).fillColor('#444').text(`Q${idx + 1}: ${questionText}`);
+        doc.fontSize(12).fillColor('#000').text(`Answer: ${r.transcribedText || ''}`);
+        doc.fontSize(12).fillColor('#333').text(`AI Score: ${r.aiScore || 0}`);
+        doc.fontSize(12).fillColor('#333').text(`AI Feedback: ${r.aiFeedback || ''}`);
+        doc.fontSize(12).fillColor('#333').text(`Keywords Matched: ${(r.keywordsMatched || []).join(', ')}`);
+        doc.fontSize(12).fillColor('#333').text(`Duration: ${r.responseDurationSeconds || 0}s`);
+        doc.moveDown(0.5);
+    });
+    doc.moveDown();
+    // Summary
+    doc.fontSize(16).fillColor('#222').text('Summary:', { underline: true });
+    doc.fontSize(12).fillColor('#333').text(report.interviewSummary || '');
+    doc.moveDown();
+    // Feedback
+    doc.fontSize(16).fillColor('#222').text('Feedback:', { underline: true });
+    doc.fontSize(12).fillColor('#333').text(report.feedback || '');
+    doc.end();
+};
+
 module.exports = {
     createSessionFromTemplate,
     submitResponse,
@@ -236,4 +379,6 @@ module.exports = {
     getSessionResponses,
     markSessionCompletedOrTerminated,
     submitDecision,
+    exportReportCSV,
+    exportReportPDF,
 };

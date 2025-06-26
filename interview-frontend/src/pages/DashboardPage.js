@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as apiClient from '../services/apiClient';
 import {
     Box, Typography, Paper, Button, Alert, CircularProgress, Stepper, Step, StepLabel,
-    TextField, Select, MenuItem, FormControl, InputLabel
+    Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -16,22 +16,6 @@ const loadingMessages = [
     "Almost there..."
 ];
 
-const AnimatedLoadingText = ({ message }) => {
-    const [dots, setDots] = useState('');
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setDots(prev => prev.length < 3 ? prev + '.' : '');
-        }, 500);
-        return () => clearInterval(interval);
-    }, []);
-    return (
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, fontWeight: 700, color: '#181818', fontSize: '1.1rem', letterSpacing: 1 }}>
-            {message}
-            <span style={{ fontSize: '1.5rem', fontWeight: 900 }}>{dots}</span>
-        </Box>
-    );
-};
-
 const getInitialTime = () => {
     const now = new Date();
     now.setMinutes(now.getMinutes() + 1);
@@ -43,7 +27,6 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
     const [selectedCandidate, setSelectedCandidate] = useState('');
     const [scheduledDate, setScheduledDate] = useState(new Date());
     const [scheduledTime, setScheduledTime] = useState(getInitialTime());
-    const [minTime, setMinTime] = useState(getInitialTime());
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('Scheduling...');
     const [error, setError] = useState('');
@@ -51,9 +34,7 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
     const loadingIntervalRef = useRef(null);
     const steps = ['Template', 'Candidate', 'Time', 'Confirm'];
     const [activeStep, setActiveStep] = useState(0);
-
-    const handleNext = () => setActiveStep((prev) => Math.min(prev + 1, steps.length - 1));
-    const handleBack = () => setActiveStep((prev) => Math.max(prev - 1, 0));
+    const [minTime, setMinTime] = useState(getInitialTime());
 
     const getScheduledAt = () => {
         if (!scheduledDate || !scheduledTime) return '';
@@ -75,17 +56,15 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
 
         if (isSameDay) {
             const newMinTime = new Date();
-            newMinTime.setMinutes(newMinTime.getMinutes()); // Set min time to now
             setMinTime(newMinTime);
             // If the currently scheduled time is now in the past, reset it
             if (scheduledTime < newMinTime) {
                 setScheduledTime(newMinTime);
             }
         } else {
-            // If it's a future date, there's no minimum time for that day
-            setMinTime(null);
+            setMinTime(null); // No minTime for future dates
         }
-    }, [scheduledDate]);
+    }, [scheduledDate, scheduledTime]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -237,13 +216,13 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
                             <Select
                                 labelId="template-label"
                                 label="Interview Template"
-                                value={selectedTemplate}
-                                onChange={(e) => { setSelectedTemplate(e.target.value); setActiveStep(1); }}
-                                required
+                            value={selectedTemplate}
+                            onChange={(e) => { setSelectedTemplate(e.target.value); setActiveStep(1); }}
+                            required
                             >
-                                {templates.map(template => (
+                            {templates.map(template => (
                                     <MenuItem key={template._id} value={template._id}>{template.title}</MenuItem>
-                                ))}
+                            ))}
                             </Select>
                         </FormControl>
                         
@@ -252,15 +231,15 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
                             <Select
                                 labelId="candidate-label"
                                 label="Candidate"
-                                value={selectedCandidate}
-                                onChange={(e) => { setSelectedCandidate(e.target.value); setActiveStep(2); }}
-                                required
+                            value={selectedCandidate}
+                            onChange={(e) => { setSelectedCandidate(e.target.value); setActiveStep(2); }}
+                            required
                             >
-                                {candidates.map(candidate => (
+                            {candidates.map(candidate => (
                                     <MenuItem key={candidate._id} value={candidate._id}>
                                         {`${candidate.firstName} ${candidate.lastName} (${candidate.email})`}
                                     </MenuItem>
-                                ))}
+                            ))}
                             </Select>
                         </FormControl>
                         
@@ -288,6 +267,7 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
                             value={scheduledTime}
                             onChange={(newValue) => { setScheduledTime(newValue); setActiveStep(3); }}
                             minutesStep={5}
+                            minTime={minTime}
                             sx={{
                                 ...formControlStyles,
                                 '& .MuiOutlinedInput-input': { color: '#bdbdbd' },
@@ -327,7 +307,7 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
                                 }}>
                                     {loadingMessage}
                                 </Typography>
-                            </Box>
+                    </Box>
                         )}
                         
                         <Button

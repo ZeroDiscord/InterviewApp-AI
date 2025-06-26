@@ -1,29 +1,28 @@
 const config = require('../config');
-
-// Custom Error class
-class AppError extends Error {
-  constructor(statusCode, message) {
-    super(message);
-    this.statusCode = statusCode;
-    this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
-    this.isOperational = true;
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
+const AppError = require('../utils/AppError');
 
 const errorHandler = (err, req, res, next) => {
-    err.statusCode = err.statusCode || 500;
-    err.status = err.status || 'error';
-
-    console.error('--- UNHANDLED ERROR ---');
-    console.error(err);
+    // If the error is not an AppError, convert it to one
+    if (!(err instanceof AppError)) {
+        // Log the original error for debugging non-operational errors
+        console.error('--- UNHANDLED OPERATIONAL ERROR ---', err);
+        
+        // Default to a 500 server error
+        const statusCode = err.statusCode || 500;
+        const message = err.message || 'Something went wrong on the server.';
+        
+        err = new AppError(statusCode, message);
+    }
+    
+    // Log the error
+    console.error(`[${err.statusCode}] ${err.message}`);
 
     res.status(err.statusCode).json({
         status: err.status,
-        title: err.name,
         message: err.message,
-        stack: config.nodeEnv === 'production' ? null : err.stack,
+        // Only show stack in development
+        stack: config.nodeEnv === 'development' ? err.stack : undefined,
     });
 };
 
-module.exports = { errorHandler, AppError };
+module.exports = { errorHandler };

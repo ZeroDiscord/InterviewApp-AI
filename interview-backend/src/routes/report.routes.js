@@ -70,4 +70,26 @@ router.get('/:sessionId/responses', protect, asyncHandler(async (req, res) => {
     res.status(200).json({ success: true, ...data });
 }));
 
+/**
+ * @desc    Export the report for an interview as CSV
+ * @route   GET /api/reports/:sessionId/export
+ * @access  Private
+ */
+router.get('/:sessionId/export', protect, async (req, res) => {
+    try {
+        await interviewService.exportReportCSV(req.params.sessionId, res);
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Export failed.' });
+    }
+});
+
+/**
+ * @desc    Export the report for an interview as PDF
+ * @route   GET /api/reports/:sessionId/export/pdf
+ * @access  Private
+ */
+router.get('/:sessionId/export/pdf', protect, asyncHandler(async (req, res) => {
+    await interviewService.exportReportPDF(req.params.sessionId, res);
+}));
+
 module.exports = router;

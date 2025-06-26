@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const asyncHandler = require('./asyncHandler');
 const User = require('../models/user.model');
 const config = require('../config');
+const AppError = require('../utils/AppError');
 
 /**
  * Protects routes by verifying the user's JWT.
@@ -22,25 +23,23 @@ const protect = asyncHandler(async (req, res, next) => {
             const decoded = jwt.verify(token, config.jwtSecret);
 
             // Fetch the user from the database using the ID from the token payload
-            // Exclude the password field from the returned document
-            req.user = await User.findById(decoded.id).select('-password');
+            const user = await User.findById(decoded.id).select('-password');
 
-            if (!req.user) {
-                res.status(401);
-                throw new Error('Not authorized, user not found');
+            if (!user) {
+                // If user associated with token is not found, it's an authorization error.
+                return next(new AppError(401, 'Not authorized, user not found.'));
             }
-
-            next();
+            
+            req.user = user;
+            return next();
         } catch (error) {
-            console.error(error);
-            res.status(401);
-            throw new Error('Not authorized, token failed');
+            // Catches JWT errors (e.g., expired, invalid)
+            return next(new AppError(401, 'Not authorized, token failed.'));
         }
     }
 
     if (!token) {
-        res.status(401);
-        throw new Error('Not authorized, no token');
+        return next(new AppError(401, 'Not authorized, no token.'));
     }
 });
 

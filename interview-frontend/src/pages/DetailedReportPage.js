@@ -16,6 +16,10 @@ import CodeIcon from '@mui/icons-material/Code';
 import SpeakerNotesIcon from '@mui/icons-material/SpeakerNotes';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import FunctionsIcon from '@mui/icons-material/Functions';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import DownloadIcon from '@mui/icons-material/Download';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
 const TabButton = ({ children, isActive, onClick }) => (
     <Button
@@ -90,6 +94,7 @@ const DetailedReportPage = ({ sessionId, onBack }) => {
         submitError: '',
         decisionMade: null, // Stores the final decision
     });
+    const [exporting, setExporting] = useState(false);
 
     const fetchAllReportData = useCallback(async (page = 1) => {
         setIsLoading(true);
@@ -147,6 +152,17 @@ const DetailedReportPage = ({ sessionId, onBack }) => {
         }
     };
 
+    const handleExport = (type) => {
+        setExporting(true);
+        apiClient.exportReport(sessionId, type)
+            .catch(err => {
+                alert('Export failed: ' + err.message);
+            })
+            .finally(() => {
+                setExporting(false);
+            });
+    };
+
     const renderTabContent = () => {
         if (isLoading) return <Box sx={{ p: 8, textAlign: 'center', color: '#bdbdbd' }}><CircularProgress sx={{ color: '#FFE066' }} /></Box>;
         if (error) return <Box sx={{ p: 8, textAlign: 'center', color: '#ff5252' }}>{error}</Box>;
@@ -165,43 +181,37 @@ const DetailedReportPage = ({ sessionId, onBack }) => {
 
                 return (
                     <Box sx={{ p: { xs: 2, md: 3 } }}>
+                        {/* Centered Score Cards */}
+                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, flexWrap: 'wrap', mb: 4 }}>
+                            <ScoreCard title="Technical" score={skillScores?.technical?.toFixed(0) || 0} icon={<CodeIcon />} color="#82ca9d" />
+                            <ScoreCard title="Communication" score={skillScores?.communication?.toFixed(0) || 0} icon={<SpeakerNotesIcon />} color="#8884d8" />
+                            <ScoreCard title="Behavioral" score={skillScores?.behavioral?.toFixed(0) || 0} icon={<PsychologyIcon />} color="#ffc658" />
+                            <ScoreCard title="Problem Solving" score={skillScores?.problemSolving?.toFixed(0) || 0} icon={<FunctionsIcon />} color="#ff8042" />
+                        </Box>
+                        {/* Main Content Area: Detailed Analysis & Skills Distribution */}
+                        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4, alignItems: 'stretch', mb: 4 }}>
+                            <Box sx={{ flex: 2, minWidth: 0 }}>
+                                <ReportBlock>
+                                    <DetailedAnalysisView analysis={detailedAnalysis || []} />
+                                </ReportBlock>
+                            </Box>
+                            <Box sx={{ flex: 1, minWidth: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <ReportBlock>
+                                    <SkillsRadarChart data={radarChartData} />
+                                </ReportBlock>
+                            </Box>
+                        </Box>
+                        {/* Right Sidebar (Summary & Recommendations) */}
                         <Grid container spacing={3}>
-                            {/* Score Cards */}
-                            <Grid item xs={12} sm={6} md={3}><ScoreCard title="Technical" score={skillScores?.technical?.toFixed(0) || 0} icon={<CodeIcon />} color="#82ca9d" /></Grid>
-                            <Grid item xs={12} sm={6} md={3}><ScoreCard title="Communication" score={skillScores?.communication?.toFixed(0) || 0} icon={<SpeakerNotesIcon />} color="#8884d8" /></Grid>
-                            <Grid item xs={12} sm={6} md={3}><ScoreCard title="Behavioral" score={skillScores?.behavioral?.toFixed(0) || 0} icon={<PsychologyIcon />} color="#ffc658" /></Grid>
-                            <Grid item xs={12} sm={6} md={3}><ScoreCard title="Problem Solving" score={skillScores?.problemSolving?.toFixed(0) || 0} icon={<FunctionsIcon />} color="#ff8042" /></Grid>
-                            
-                            {/* Main Content Area */}
-                            <Grid item xs={12} lg={8}>
-                                <Grid container spacing={3}>
-                                    <Grid item xs={12} md={7}>
-                                        <ReportBlock>
-                                            <DetailedAnalysisView analysis={detailedAnalysis || []} />
-                                        </ReportBlock>
-                                    </Grid>
-                                    <Grid item xs={12} md={5}>
-                                        <ReportBlock>
-                                            <SkillsRadarChart data={radarChartData} />
-                                        </ReportBlock>
-                                    </Grid>
-                                </Grid>
+                            <Grid item xs={12} md={6} lg={6}>
+                                <ReportBlock>
+                                    <SummaryAndFeedback summary={interviewSummary} feedback={feedback} />
+                                </ReportBlock>
                             </Grid>
-
-                            {/* Right Sidebar */}
-                            <Grid item xs={12} lg={4}>
-                                <Grid container spacing={3}>
-                                    <Grid item xs={12}>
-                                        <ReportBlock>
-                                            <SummaryAndFeedback summary={interviewSummary} feedback={feedback} />
-                                        </ReportBlock>
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <ReportBlock>
-                                            <RecommendationsView recommendations={recommendations} />
-                                        </ReportBlock>
-                                    </Grid>
-                                </Grid>
+                            <Grid item xs={12} md={6} lg={6}>
+                                <ReportBlock>
+                                    <RecommendationsView recommendations={recommendations} />
+                                </ReportBlock>
                             </Grid>
                         </Grid>
                     </Box>
@@ -228,16 +238,38 @@ const DetailedReportPage = ({ sessionId, onBack }) => {
                 }}
             >
                 <Box sx={{ p: { xs: 2, sm: 3 } }}>
-                    <Button onClick={onBack} sx={{ color: '#FFE066', fontWeight: 700, mb: 2, textTransform: 'none', '&:hover': { color: '#fff' } }}>
-                        &larr; Back to Admin Panel
-                    </Button>
-                    <Box sx={{ borderBottom: '1px solid #2c2c2c', mb: 0 }}>
-                        <TabButton isActive={activeTab === 'summary'} onClick={() => setActiveTab('summary')}>Overall Summary</TabButton>
-                        <TabButton isActive={activeTab === 'questions'} onClick={() => setActiveTab('questions')}>Questions List</TabButton>
-                        <TabButton isActive={activeTab === 'breakdown'} onClick={() => setActiveTab('breakdown')}>Response Breakdown</TabButton>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Button onClick={onBack} sx={{ color: '#FFE066', fontWeight: 700, textTransform: 'none', '&:hover': { color: '#fff' } }}>
+                    &larr; Back to Admin Panel
+                </Button>
+                        <Box sx={{ display: 'flex', gap: 2 }}>
+                            <Button
+                                variant="outlined"
+                                startIcon={<DownloadIcon />}
+                                onClick={() => handleExport('csv')}
+                                disabled={exporting}
+                                sx={{ color: '#FFE066', borderColor: '#FFE066', fontWeight: 700, borderRadius: 2, px: 3, py: 1, '&:hover': { bgcolor: '#FFE066', color: '#181818' } }}
+                            >
+                                {exporting ? 'Exporting...' : 'Export as CSV'}
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                startIcon={<PictureAsPdfIcon />}
+                                onClick={() => handleExport('pdf')}
+                                disabled={exporting}
+                                sx={{ color: '#ff5252', borderColor: '#ff5252', fontWeight: 700, borderRadius: 2, px: 3, py: 1, '&:hover': { bgcolor: '#ff5252', color: '#fff' } }}
+                            >
+                                {exporting ? 'Exporting...' : 'Export as PDF'}
+                            </Button>
+                        </Box>
                     </Box>
+                    <Box sx={{ borderBottom: '1px solid #2c2c2c', mb: 0 }}>
+                    <TabButton isActive={activeTab === 'summary'} onClick={() => setActiveTab('summary')}>Overall Summary</TabButton>
+                    <TabButton isActive={activeTab === 'questions'} onClick={() => setActiveTab('questions')}>Questions List</TabButton>
+                    <TabButton isActive={activeTab === 'breakdown'} onClick={() => setActiveTab('breakdown')}>Response Breakdown</TabButton>
+                </Box>
                     <Box>
-                        {renderTabContent()}
+                    {renderTabContent()}
                     </Box>
                 </Box>
                 
@@ -369,25 +401,48 @@ const DetailedReportPage = ({ sessionId, onBack }) => {
 // --- Sub-components for the tabs ---
 
 const QuestionsListView = ({ questions }) => (
-    <Box sx={{ p: 4, display: 'flex', flexDirection: 'column', gap: 3, fontFamily: 'inherit' }}>
+    <Box sx={{ p: { xs: 2, md: 4 } }}>
         {questions.map((q, index) => (
-            <Box key={q._id} sx={{ p: 3, border: '1px solid #232526', borderRadius: 2, background: '#232526' }}>
-                <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: '#FFE066', fontFamily: 'inherit' }}>Q{index + 1}: {q.questionText}</Typography>
-                <Box sx={{ mt: 2, pl: 2, borderLeft: '4px solid #FFE066' }}>
-                    <Typography sx={{ fontWeight: 600, fontSize: '0.95rem', color: '#bdbdbd', fontFamily: 'inherit' }}>Ideal Answer:</Typography>
-                    <Typography sx={{ color: '#fff', fontStyle: 'italic', fontFamily: 'inherit' }}>{q.idealAnswer}</Typography>
-                    <Typography sx={{ fontWeight: 600, fontSize: '0.95rem', color: '#bdbdbd', mt: 2, fontFamily: 'inherit' }}>Keywords:</Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                        {q.keywords.map(kw => <Box key={kw} sx={{ background: '#FFE066', color: '#181818', fontSize: '0.85rem', fontWeight: 700, px: 1.5, py: 0.5, borderRadius: 2, fontFamily: 'inherit' }}>{kw}</Box>)}
+            <Paper 
+                key={q._id} 
+                elevation={0} 
+                sx={{ 
+                    p: 3, 
+                    mb: 3,
+                    background: '#1E1E1E',
+                    borderLeft: '4px solid #FFE066',
+                    borderRadius: '0 8px 8px 0',
+                }}
+            >
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', mb: 2 }}>
+                    Q{index + 1}: {q.questionText}
+                </Typography>
+                <Box sx={{ color: '#bdbdbd', lineHeight: 1.7, '& p': { my: 0 }, '& strong': { color: '#FFE066' } }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>Ideal Answer:</Typography>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{q.idealAnswer}</ReactMarkdown>
                     </Box>
+                <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {q.keywords.map(keyword => (
+                        <Button key={keyword} size="small" sx={{ 
+                            background: '#333',
+                            color: '#FFE066',
+                            borderRadius: '16px',
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            pointerEvents: 'none',
+                        }}>
+                            {keyword}
+                        </Button>
+                    ))}
                 </Box>
-            </Box>
+            </Paper>
         ))}
     </Box>
 );
 
 const BreakdownView = ({ responses, pagination, onPageChange }) => {
     const audioRefs = useRef([]);
+
     const handlePlay = (idx) => {
         if (audioRefs.current[idx]) {
             audioRefs.current.forEach((audio, i) => {
@@ -396,6 +451,7 @@ const BreakdownView = ({ responses, pagination, onPageChange }) => {
             audioRefs.current[idx].play();
         }
     };
+
     return (
         <Box sx={{ p: 4, fontFamily: 'inherit' }}>
             <Box sx={{ overflowX: 'auto', fontFamily: 'inherit' }}>

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as apiClient from '../services/apiClient';
 import AudioRecorder from '../components/AudioRecorder';
 import { Box, Typography, Paper, Button, CircularProgress, Snackbar, Alert } from '@mui/material';
-import InterviewCompletedPage from './InterviewCompletedPage';
 import TerminatedPage from './TerminatedPage';
 
 const infractionMessages = {
@@ -76,7 +75,7 @@ const CameraView = React.memo(({ videoRef, correctiveSeconds, infractionType, lo
                         </Typography>
                     </Box>
                 )}
-            </Box>
+        </Box>
         </Paper>
     );
 });
@@ -125,9 +124,6 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
     const [mediaStream, setMediaStream] = useState(null);
     const [submissionData, setSubmissionData] = useState(null);
     const [autoSubmitMessage, setAutoSubmitMessage] = useState('');
-    const [timeLeft, setTimeLeft] = useState(300);
-    const [proctorWarning, setProctorWarning] = useState(null);
-    const [interviewEnded, setInterviewEnded] = useState(false);
     const [terminated, setTerminated] = useState(false);
     const [warningCount, setWarningCount] = useState(0);
     const [maxWarnings, setMaxWarnings] = useState(3);
@@ -135,17 +131,8 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
     const [lastWarning, setLastWarning] = useState('');
     const [correctiveSeconds, setCorrectiveSeconds] = useState(null);
     const [infractionType, setInfractionType] = useState(null);
-    const [correctionWindowStart, setCorrectionWindowStart] = useState(null);
-    const [correctionWindowDuration, setCorrectionWindowDuration] = useState(8);
-    const [correctionWindowHistory, setCorrectionWindowHistory] = useState([]);
     const [proctoringEventLog, setProctoringEventLog] = useState([]);
     const [terminationReason, setTerminationReason] = useState(null);
-    const [interviewProgress, setInterviewProgress] = useState({});
-    const [loadingError, setLoadingError] = useState(null);
-    const [cameraError, setCameraError] = useState('');
-    const [isStreamReady, setIsStreamReady] = useState(false);
-    const [timerStart, setTimerStart] = useState(null);
-    const [timerEnd, setTimerEnd] = useState(null);
     const [displayTime, setDisplayTime] = useState(300);
     const rafRef = useRef(null);
 
@@ -153,10 +140,7 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
     const correctionTimerRef = useRef(null);
     const videoRef = useRef(null);
     
-    const [videoTrackStatus, setVideoTrackStatus] = useState('');
-    const [videoElementStatus, setVideoElementStatus] = useState('');
     const [videoHasPlayed, setVideoHasPlayed] = useState(false);
-    const [videoPlayTimeout, setVideoPlayTimeout] = useState(false);
     
     const handleNextQuestion = useCallback(async () => {
         if (!sessionData) return;
@@ -187,7 +171,7 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
         setError('');
         try {
             const currentQuestion = sessionData.questions[currentQuestionIndex];
-            const duration = currentQuestion.timeLimitSeconds - timeLeft;
+            const duration = currentQuestion.timeLimitSeconds - displayTime;
             const responseData = {
                 questionId: currentQuestion._id,
                 transcribedText: dataToSubmit.transcription,
@@ -201,7 +185,7 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
         } finally {
             setIsSubmitting(false);
         }
-    }, [sessionData, currentQuestionIndex, timeLeft, handleNextQuestion, isSubmitting]);
+    }, [sessionData, currentQuestionIndex, displayTime, handleNextQuestion, isSubmitting]);
 
     const handleTranscriptionComplete = useCallback((result) => {
         if (result.isEmpty) {
@@ -222,8 +206,6 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
             endTime = Date.now() + currentQuestion.timeLimitSeconds * 1000;
             localStorage.setItem(timerKey, endTime);
         }
-        setTimerStart(Date.now());
-        setTimerEnd(Number(endTime));
         setDisplayTime(Math.round((Number(endTime) - Date.now()) / 1000));
         let lastTime = null;
         const update = () => {
@@ -265,12 +247,13 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
 
     useEffect(() => {
         const startMedia = async () => {
+            // Wait a tick to ensure previous stream is released
+            await new Promise(resolve => setTimeout(resolve, 200));
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 setMediaStream(stream);
             } catch (err) {
                 setError('Could not access your camera and microphone. Please check browser permissions.');
-                setCameraError('Could not access your camera and microphone. Please check browser permissions.');
             }
         };
         startMedia();
@@ -282,33 +265,16 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
     }, []);
 
     useEffect(() => {
-        if (mediaStream) {
-            const tracks = mediaStream.getVideoTracks();
-            if (!tracks.length) {
-                setVideoTrackStatus('No video tracks found in stream.');
-            } else {
-                const track = tracks[0];
-                setVideoTrackStatus(`Track enabled: ${track.enabled}, muted: ${track.muted}, readyState: ${track.readyState}`);
-                if (!track.enabled || track.muted || track.readyState !== 'live') {
-                    setVideoTrackStatus('Video track is present but not live/enabled.');
-                }
-            }
-        }
-    }, [mediaStream]);
-
-    useEffect(() => {
         if (mediaStream && videoRef.current) {
             const video = videoRef.current;
             video.srcObject = mediaStream;
             let played = false;
             const onPlay = () => {
                 setVideoHasPlayed(true);
-                setVideoElementStatus('play');
                 played = true;
             };
             const onCanPlay = () => {
                 setVideoHasPlayed(true);
-                setVideoElementStatus('canplay');
                 played = true;
             };
             video.addEventListener('play', onPlay);
@@ -319,7 +285,7 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
             }).catch(() => {});
             // Fallback: if not played in 3s, show warning
             const fallback = setTimeout(() => {
-                if (!played) setVideoPlayTimeout(true);
+                if (!played) setAutoSubmitMessage("Auto-Submitting | Video not played");
             }, 3000);
             return () => {
                 video.removeEventListener('play', onPlay);
@@ -339,8 +305,6 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                 
                 // Only restore if the correction window hasn't expired
                 if (timeRemaining > 0) {
-                    setCorrectionWindowStart(parsed.start);
-                    setCorrectionWindowDuration(parsed.duration);
                     setInfractionType(parsed.infraction);
                     setCorrectiveSeconds(timeRemaining);
                 } else {
@@ -348,14 +312,10 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                     localStorage.removeItem(getSessionKey(sessionData._id, 'correctionWindow'));
                 }
             }
-            const storedHistory = localStorage.getItem(getSessionKey(sessionData._id, 'correctionWindowHistory'));
-            if (storedHistory) setCorrectionWindowHistory(JSON.parse(storedHistory));
             const storedEventLog = localStorage.getItem(getSessionKey(sessionData._id, 'proctoringEventLog'));
             if (storedEventLog) setProctoringEventLog(JSON.parse(storedEventLog));
             const storedTermination = localStorage.getItem(getSessionKey(sessionData._id, 'terminationReason'));
             if (storedTermination) setTerminationReason(storedTermination);
-            const storedProgress = localStorage.getItem(getSessionKey(sessionData._id, 'interviewProgress'));
-            if (storedProgress) setInterviewProgress(JSON.parse(storedProgress));
         }
     }, [sessionData]);
 
@@ -399,7 +359,6 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                         }
                     }
                     if (result.warning) {
-                        setProctorWarning(result.warning);
                         setShowWarning(true);
                         setLastWarning(result.warning);
                         setTimeout(() => setShowWarning(false), 3000);
@@ -411,8 +370,6 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                         // Only set correction window if there's an actual infraction
                         setInfractionType(correctionWindow.infraction);
                         setCorrectiveSeconds(correctionWindow.seconds_left);
-                        setCorrectionWindowStart(correctionWindow.start_time);
-                        setCorrectionWindowDuration(correctionWindow.duration);
                         
                         // Start local timer if not already running
                         if (!correctionTimerRef.current) {
@@ -431,8 +388,6 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                         // No correction window or cleared - reset all state
                         setInfractionType(null);
                         setCorrectiveSeconds(null);
-                        setCorrectionWindowStart(null);
-                        setCorrectionWindowDuration(null);
                         // Clear the local timer
                         if (correctionTimerRef.current) {
                             clearInterval(correctionTimerRef.current);
@@ -441,10 +396,8 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                     }
                     
                     // Update history and logs
-                    setCorrectionWindowHistory(result.correction_window_history || []);
                     setProctoringEventLog(result.proctoring_event_log || []);
                     setTerminationReason(result.termination_reason || null);
-                    setInterviewProgress(result.interview_progress || {});
                     
                     // Persist correction window state to localStorage
                     const sessionId = sessionData._id;
@@ -458,12 +411,10 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                         localStorage.removeItem(getSessionKey(sessionId, 'correctionWindow'));
                     }
                     
-                    localStorage.setItem(getSessionKey(sessionId, 'correctionWindowHistory'), JSON.stringify(result.correction_window_history || []));
                     localStorage.setItem(getSessionKey(sessionId, 'proctoringEventLog'), JSON.stringify(result.proctoring_event_log || []));
                     if (result.termination_reason) localStorage.setItem(getSessionKey(sessionId, 'terminationReason'), result.termination_reason);
-                    localStorage.setItem(getSessionKey(sessionId, 'interviewProgress'), JSON.stringify(result.interview_progress || {}));
                 } catch (err) {
-                    setLoadingError('Camera or proctoring service failed to load. Please check your connection and refresh.');
+                    setError('Camera or proctoring service failed to load. Please check your connection and refresh.');
                 }
             }, 1500); // Increased interval from 100ms to 1500ms
         }
@@ -473,40 +424,26 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
     }, [mediaStream, sessionData, videoHasPlayed]);
 
     useEffect(() => {
-        if ((terminated || interviewEnded) && sessionData && sessionData._id) {
+        if (terminated && sessionData && sessionData._id) {
             localStorage.removeItem(`proctorWarnings-${sessionData._id}`);
         }
-    }, [terminated, interviewEnded, sessionData]);
+    }, [terminated, sessionData]);
     
-    const handleRetryCamera = () => {
-        setCameraError('');
-        setIsStreamReady(false);
-        setMediaStream(null);
-        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-            .then(stream => {
-                setMediaStream(stream);
-            })
-            .catch(err => {
-                setCameraError('Could not access your camera and microphone. Please check browser permissions.');
-                setError('Could not access your camera and microphone. Please check browser permissions.');
-            });
-    };
-
     useEffect(() => {
-        if ((terminated || interviewEnded) && mediaStream) {
+        if (terminated && mediaStream) {
             mediaStream.getTracks().forEach(track => track.stop());
             setMediaStream(null);
         }
-    }, [terminated, interviewEnded, mediaStream]);
+    }, [terminated, mediaStream]);
 
     // Also stop microphone tracks if any are still active
     useEffect(() => {
-        if ((terminated || interviewEnded) && mediaStream) {
+        if (terminated && mediaStream) {
             mediaStream.getAudioTracks().forEach(track => {
                 if (track.readyState === 'live') track.stop();
             });
         }
-    }, [terminated, interviewEnded, mediaStream]);
+    }, [terminated, mediaStream]);
 
     // Local correction window timer for smooth countdown
     useEffect(() => {
@@ -565,7 +502,7 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
             });
         }
     }, [terminated, sessionData, terminationReason, proctoringEventLog, warningCount]);
-
+    
     if (isLoading) return <Box sx={{ textAlign: 'center', p: 12, color: 'white', fontFamily: 'Inter, Roboto, Arial, sans-serif' }}><CircularProgress sx={{ color: '#FFE066' }} /></Box>;
     if (error) return <Box sx={{ textAlign: 'center', p: 12, background: '#2d1a1a', color: '#ff5252', borderRadius: 2, fontFamily: 'Inter, Roboto, Arial, sans-serif' }}>{error}</Box>;
     if (!sessionData || !currentQuestion) return <Box sx={{ textAlign: 'center', p: 12, color: '#bdbdbd', fontFamily: 'Inter, Roboto, Arial, sans-serif' }}>Could not load question data.</Box>;
@@ -573,7 +510,6 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
     const formatTime = (seconds) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
 
     if (terminated) return <TerminatedPage onRedirect={onInterviewComplete} />;
-    if (interviewEnded) return <InterviewCompletedPage onRedirect={onInterviewComplete} />;
 
     const maxTime = currentQuestion?.timeLimitSeconds || 300;
 
@@ -601,7 +537,11 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                                 <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: '#FFE066', fontFamily: 'inherit' }}>Question {currentQuestionIndex + 1} of {sessionData.questions.length}</Typography>
                                 <PillTimer value={displayTime} max={currentQuestion.timeLimitSeconds} />
                             </Box>
-                            <Typography sx={{ fontSize: '1.15rem', color: '#fff', fontFamily: 'inherit', lineHeight: 1.7 }}>{currentQuestion.questionText}</Typography>
+                            <Typography sx={{ fontSize: '1.15rem', color: '#fff', fontFamily: 'inherit', lineHeight: 1.7 }}>
+                                <span style={{ userSelect: 'none', pointerEvents: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}>
+                                    {currentQuestion.questionText}
+                                </span>
+                            </Typography>
                         </Paper>
                         <Paper elevation={3} sx={{ width: '100%', p: 4, background: '#232526', borderRadius: 2, boxShadow: '0 4px 24px 0 #0002', fontFamily: 'inherit' }}>
                             {isSubmitting ? (

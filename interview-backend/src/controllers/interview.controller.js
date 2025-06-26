@@ -1,6 +1,6 @@
 const interviewService = require('../services/interview.service.js');
 const { transcribeAudio } = require('../services/transcription.service');
-const { AppError } = require('../middleware/errorHandler');
+const AppError = require('../utils/AppError');
 const InterviewSession = require('../models/interviewSession.model.js');
 const User = require('../models/user.model.js');
 const { sendInviteEmail, sendDecisionEmail } = require('../utils/mail');

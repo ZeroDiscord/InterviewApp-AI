@@ -13,8 +13,14 @@ const request = async (endpoint, options = {}) => {
     try {
         const response = await fetch(url, config);
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.indexOf('application/json') !== -1) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            } else {
+                const errorText = await response.text();
+                throw new Error(errorText || `HTTP error! status: ${response.status}`);
+            }
         }
         return response.status === 204 ? null : response.json();
     } catch (error) {
@@ -88,3 +94,38 @@ export const submitDecision = (sessionId, { decision, comments }) =>
     method: 'POST',
     body: JSON.stringify({ decision, comments }),
   });
+
+/**
+ * Handles exporting a report as either CSV or PDF and triggers a file download.
+ * @param {string} sessionId - The ID of the interview session.
+ * @param {'csv' | 'pdf'} type - The desired export format.
+ */
+export const exportReport = async (sessionId, type) => {
+    const url = `${API_BASE_URL}/reports/${sessionId}/export${type === 'pdf' ? '/pdf' : ''}`;
+    const token = localStorage.getItem('token');
+    const headers = { 'Authorization': `Bearer ${token}` };
+
+    try {
+        const response = await fetch(url, { headers });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Export failed.');
+        }
+
+        const blob = await response.blob();
+        const fileName = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replaceAll('"', '') || `report_${sessionId}.${type}`;
+        
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(link.href);
+
+    } catch (error) {
+        console.error(`Export Error: ${error.message}`);
+        throw error;
+    }
+};

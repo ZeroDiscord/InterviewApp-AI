@@ -21,8 +21,16 @@ connectDB();
 
 // --- Core Middleware ---
 
-// FIX: Use the cors middleware. This will handle preflight requests automatically.
-app.use(cors());
+// Set up CORS options for more control
+const corsOptions = {
+    origin: 'http://localhost:3000', // Allow only the frontend to make requests
+    methods: 'GET,POST,PUT,DELETE,PATCH,OPTIONS', // Specify allowed methods
+    allowedHeaders: 'Content-Type,Authorization', // Specify allowed headers
+    credentials: true
+};
+
+// Use the cors middleware with our options. This will handle preflight requests.
+app.use(cors(corsOptions));
 
 app.use(express.json());
 

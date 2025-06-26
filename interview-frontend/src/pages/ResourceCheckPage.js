@@ -1,98 +1,187 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Box, Typography, Paper, Button, CircularProgress, Alert } from '@mui/material';
+import { Box, Typography, Paper, Button, Alert, CircularProgress } from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+
+// Simple API client for this page
+const apiClient = {
+    analyzeFrame: async (imageBlob) => {
+        const formData = new FormData();
+        formData.append('frame', imageBlob, 'frame.jpg');
+        
+        // This endpoint will need to be created in your Flask proctoring API
+        const response = await fetch('http://localhost:5001/analyze_frame', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to analyze frame.');
+        }
+        return response.json();
+    }
+};
 
 const ResourceCheckPage = ({ onSuccess }) => {
     const [micStatus, setMicStatus] = useState('pending');
+    const [cameraStatus, setCameraStatus] = useState('pending');
+    const [analysis, setAnalysis] = useState({ status: 'pending', landmarks: null });
     const [error, setError] = useState('');
-    const [micLevel, setMicLevel] = useState(0);
+    
+    const videoRef = useRef(null);
+    const canvasRef = useRef(null);
     const streamRef = useRef(null);
-    const audioContextRef = useRef(null);
-    const analyserRef = useRef(null);
-    const animationRef = useRef(null);
 
-    useEffect(() => {
-        setError('');
-        setMicStatus('pending');
-        // Request only microphone
-        navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(stream => {
-                streamRef.current = stream;
-                try {
-                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    audioContextRef.current = audioContext;
-                    const source = audioContext.createMediaStreamSource(stream);
-                    const analyser = audioContext.createAnalyser();
-                    analyser.fftSize = 256;
-                    source.connect(analyser);
-                    analyserRef.current = analyser;
-                    setMicStatus('ok');
-                    // Animate mic level
-                    const updateMic = () => {
-                        const data = new Uint8Array(analyser.frequencyBinCount);
-                        analyser.getByteFrequencyData(data);
-                        const avg = data.reduce((a, b) => a + b, 0) / data.length;
-                        setMicLevel(avg);
-                        animationRef.current = requestAnimationFrame(updateMic);
-                    };
-                    updateMic();
-                } catch (e) {
-                    setMicStatus('error');
-                    setError('Microphone not working or permission denied.');
-                }
-            })
-            .catch(err => {
-                setError('Microphone not accessible. Please allow access and retry.');
-                setMicStatus('error');
-            });
-        return () => {
+    // Helper to stop the media stream
+    const stopMediaStream = () => {
+        return new Promise((resolve) => {
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
             }
-            if (audioContextRef.current) {
-                audioContextRef.current.close();
+            // Wait a tick to ensure browser releases the device
+            setTimeout(resolve, 100);
+        });
+    };
+
+    // Effect to get media and perform the check
+    useEffect(() => {
+        const performCheck = async () => {
+            try {
+                // 1. Get Camera and Mic Stream
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                streamRef.current = stream;
+                setMicStatus('ok');
+
+                // Attach stream to video element
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                    videoRef.current.onloadedmetadata = () => {
+                        setCameraStatus('ok');
+                        
+                        // 2. Auto-capture after a delay
+                        setTimeout(captureAndAnalyze, 2000);
+                    };
+                }
+            } catch (err) {
+                setError('Camera or Microphone not accessible. Please allow access and retry.');
+                setCameraStatus('error');
+                setMicStatus('error');
             }
-            if (animationRef.current) {
-                cancelAnimationFrame(animationRef.current);
-            }
+        };
+
+        performCheck();
+
+        // 5. Graceful Teardown
+        return () => {
+            stopMediaStream();
         };
     }, []);
 
-    const canContinue = micStatus === 'ok';
+    // 3. Capture and Analyze Frame
+    const captureAndAnalyze = async () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        setAnalysis({ status: 'loading', landmarks: null });
+
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        const context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(async (blob) => {
+            try {
+                const result = await apiClient.analyzeFrame(blob);
+                if (result.success && result.landmarks) {
+                    drawLandmarks(result.landmarks);
+                    setAnalysis({ status: 'ok', landmarks: result.landmarks });
+                } else {
+                    setAnalysis({ status: 'error', landmarks: null });
+                }
+            } catch (err) {
+                setAnalysis({ status: 'error', landmarks: null });
+                setError(err.message);
+            }
+        }, 'image/jpeg');
+    };
+
+    // 4. Draw landmarks on canvas
+    const drawLandmarks = (landmarks) => {
+        const canvas = canvasRef.current;
+        const context = canvas.getContext('2d');
+        context.font = '16px Arial';
+        context.fillStyle = '#FFE066';
+
+        Object.entries(landmarks).forEach(([key, { x, y }]) => {
+            context.fillText(key.charAt(0).toUpperCase() + key.slice(1), x + 10, y + 5);
+            context.beginPath();
+            context.arc(x, y, 5, 0, 2 * Math.PI);
+            context.fill();
+        });
+    };
+
+    // Handler for Continue button
+    const handleContinue = async () => {
+        await stopMediaStream();
+        onSuccess();
+    };
+
+    const allChecksPassed = micStatus === 'ok' && cameraStatus === 'ok' && analysis.status === 'ok';
 
     return (
-        <Box sx={{ minHeight: '100vh', background: 'radial-gradient(ellipse at top left, #232526 60%, #181818 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', py: 6, fontFamily: 'Inter, Roboto, Arial, sans-serif' }}>
-            <Paper elevation={3} sx={{ p: { xs: 2, sm: 5 }, maxWidth: 600, width: '100%', mx: 2, background: 'rgba(24, 24, 24, 0.98)', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)', color: '#fff', borderRadius: 3, fontFamily: 'inherit' }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: '#fff', mb: 2, textAlign: 'center', fontFamily: 'inherit', letterSpacing: 0.5 }}>
-                    Microphone Check
+        <Box sx={{ minHeight: '100vh', background: '#121212', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Paper sx={{ p: 4, maxWidth: 700, width: '100%', background: '#1E1E1E', color: '#fff', borderRadius: 3 }}>
+                <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, textAlign: 'center' }}>
+                    System & Resource Check
                 </Typography>
-                <Typography variant="subtitle1" sx={{ color: '#bdbdbd', fontWeight: 400, mb: 4, textAlign: 'center', fontFamily: 'inherit' }}>
-                    Please ensure your microphone is working before starting the interview.
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mb: 3 }}>
-                    <Box>
-                        <Typography sx={{ color: '#FFE066', fontWeight: 700, mb: 1 }}>Microphone Test</Typography>
-                        <Box sx={{ width: '100%', height: 24, background: '#222', borderRadius: 8, overflow: 'hidden', mb: 1, position: 'relative' }}>
-                            <Box sx={{ width: `${Math.min(100, Math.round(micLevel))}%`, height: '100%', background: micLevel > 10 ? '#4caf50' : '#ff5252', transition: 'width 0.2s' }} />
-                        </Box>
-                        {micStatus === 'pending' && <Typography sx={{ color: '#bdbdbd' }}>Checking microphone...</Typography>}
-                        {micStatus === 'ok' && <Typography sx={{ color: '#4caf50' }}>Microphone working!</Typography>}
-                        {micStatus === 'error' && <Typography sx={{ color: '#ff5252' }}>Microphone not working.</Typography>}
+
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 4, alignItems: 'center' }}>
+                    {/* Camera Feed & Canvas */}
+                    <Box sx={{ position: 'relative', width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: 2, overflow: 'hidden' }}>
+                        <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <canvas ref={canvasRef} style={{ display: analysis.status !== 'pending' ? 'block' : 'none', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+                    </Box>
+
+                    {/* Status List */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <StatusItem status={cameraStatus} text="Camera Access" />
+                        <StatusItem status={micStatus} text="Microphone Access" />
+                        <StatusItem status={analysis.status} text="Face Detection Analysis" />
                     </Box>
                 </Box>
-                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                
                 <Box sx={{ mt: 4, textAlign: 'center' }}>
                     <Button
-                        onClick={onSuccess}
+                        onClick={handleContinue}
                         variant="contained"
-                        color="primary"
-                        sx={{ py: 1.5, px: 6, minWidth: '220px', fontSize: '1.1rem', fontWeight: 700, fontFamily: 'inherit', borderRadius: 1.5, boxShadow: 'none', background: canContinue ? '#FFE066' : '#bdbdbd', color: canContinue ? '#181818' : '#fff', pointerEvents: canContinue ? 'auto' : 'none', transition: 'all 0.2s' }}
-                        disabled={!canContinue}
+                        sx={{ py: 1.5, px: 6, fontSize: '1.1rem', fontWeight: 700, background: allChecksPassed ? '#FFE066' : '#444', color: '#181818', '&:hover': { background: '#FFD133' } }}
+                        disabled={!allChecksPassed}
                     >
-                        Continue
+                        {allChecksPassed ? 'Continue' : 'Checking...'}
                     </Button>
                 </Box>
             </Paper>
         </Box>
+    );
+};
+
+const StatusItem = ({ status, text }) => {
+    const getIcon = () => {
+        switch (status) {
+            case 'ok': return <CheckCircleIcon sx={{ color: '#4caf50' }} />;
+            case 'error': return <CancelIcon sx={{ color: '#ff5252' }} />;
+            default: return <CircularProgress size={20} sx={{ color: '#bdbdbd' }} />;
+        }
+    };
+    return (
+        <Paper elevation={0} sx={{ p: 2, background: '#2c2c2c', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+            {getIcon()}
+            <Typography sx={{ fontWeight: 500 }}>{text}</Typography>
+        </Paper>
     );
 };
 
