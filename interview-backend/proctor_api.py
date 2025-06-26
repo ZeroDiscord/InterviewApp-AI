@@ -26,14 +26,6 @@ WARNING_TYPES = {
     'PROFILE_FACE': 'profile_face'
 }
 
-# Initialize mediapipe FaceMesh
-mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=5, refine_landmarks=True)
-
-# Initialize Mediapipe Holistic for whole-person detection
-mp_holistic = mp.solutions.holistic
-holistic = mp_holistic.Holistic(static_image_mode=True, model_complexity=1, enable_segmentation=False, refine_face_landmarks=True)
-
 # 6-point indices for pose estimation
 LANDMARK_IDXS = [1, 152, 263, 33, 61, 291]  # nose tip, chin, left eye left, right eye right, left mouth, right mouth
 MODEL_POINTS = np.array([
@@ -177,6 +169,14 @@ def clear_correction_window(session):
 
 @app.route('/proctor', methods=['POST'])
 def proctor():
+    # --- Model Initialization Inside Endpoint ---
+    # Moved from global scope to ensure thread-safety and statelessness per request.
+    mp_face_mesh = mp.solutions.face_mesh
+    face_mesh = mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=5, refine_landmarks=True, min_detection_confidence=0.5)
+    
+    mp_holistic = mp.solutions.holistic
+    holistic = mp_holistic.Holistic(static_image_mode=True, model_complexity=1, enable_segmentation=False, refine_face_landmarks=True, min_detection_confidence=0.5)
+
     data = request.json
     if not data:
         return jsonify({'warning': 'No data received.', 'warning_count': 0, 'max_warnings': MAX_WARNINGS, 'terminated': False})

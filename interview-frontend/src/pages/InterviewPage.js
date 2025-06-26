@@ -133,7 +133,6 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
     const [maxWarnings, setMaxWarnings] = useState(3);
     const [showWarning, setShowWarning] = useState(false);
     const [lastWarning, setLastWarning] = useState('');
-    const [debugImage, setDebugImage] = useState(null);
     const [correctiveSeconds, setCorrectiveSeconds] = useState(null);
     const [infractionType, setInfractionType] = useState(null);
     const [correctionWindowStart, setCorrectionWindowStart] = useState(null);
@@ -386,11 +385,6 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                     // Log debug information
                     if (result.debug_info) {
                         console.log('🔍 Proctoring Debug Info:', result.debug_info);
-                    }
-                    
-                    // Set debug image if available
-                    if (result.debug_image) {
-                        setDebugImage(`data:image/jpeg;base64,${result.debug_image}`);
                     }
                     
                     if (result.terminated) {
@@ -715,25 +709,6 @@ const InterviewPage = ({ uniqueLink, onInterviewComplete }) => {
                                     </Box>
                                 )}
                             </Box>
-                            
-                            {/* Debug Image Display */}
-                            {debugImage && (
-                                <Box sx={{ mt: 2, p: 2, background: '#181818', borderRadius: 2, border: '1px solid #333' }}>
-                                    <Typography sx={{ color: '#FFE066', fontWeight: 700, mb: 1, fontSize: '0.9rem' }}>
-                                        Debug View (Backend Detection)
-                                    </Typography>
-                                    <img 
-                                        src={debugImage} 
-                                        alt="Debug View" 
-                                        style={{ 
-                                            width: '100%', 
-                                            height: 'auto', 
-                                            borderRadius: 4,
-                                            border: '1px solid #444'
-                                        }} 
-                                    />
-                                </Box>
-                            )}
                         </Paper>
                     </Box>
                 </Box>

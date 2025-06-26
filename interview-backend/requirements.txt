@@ -2,4 +2,6 @@ flask
 flask-cors
 opencv-python
 mediapipe
-numpy 
+numpy
+requests
+gunicorn 
