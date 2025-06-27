@@ -63,7 +63,7 @@ const InterviewCompletedPage = ({ onRedirect }) => {
                 }}
             >
                 <CheckCircle sx={{ fontSize: 80, color: '#FFE066', mb: 2 }} />
-                <Typography variant="h3" component="h1" sx={{ fontWeight: 700, color: '#fff', mb: 1, fontFamily: 'inherit', letterSpacing: 0.5 }} gutterBottom>
+                <Typography variant="h3" component="h1" sx={{ color: '#FFE066', fontWeight: 900, fontFamily: 'Inter, Roboto, Arial, sans-serif', letterSpacing: 1, textShadow: '0 2px 16px #ffe06633', mb: 1, textAlign: 'center' }} gutterBottom>
                     Thank You!
                 </Typography>
                 <Typography variant="h6" sx={{ color: '#bdbdbd', fontWeight: 400, maxWidth: '600px', mb: 4, fontFamily: 'inherit' }}>

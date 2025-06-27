@@ -33,7 +33,7 @@ const InstructionsPage = ({ onBegin }) => {
                     fontFamily: 'inherit',
                 }}
             >
-                <Typography variant="h4" sx={{ fontWeight: 700, color: '#fff', mb: 2, textAlign: 'center', fontFamily: 'inherit', letterSpacing: 0.5 }}>
+                <Typography variant="h4" sx={{ color: '#FFE066', fontWeight: 900, fontFamily: 'Inter, Roboto, Arial, sans-serif', letterSpacing: 1, textShadow: '0 2px 16px #ffe06633', mb: 2, textAlign: 'center' }}>
                     Interview Instructions
                 </Typography>
                 <Typography variant="subtitle1" sx={{ color: '#bdbdbd', fontWeight: 400, mb: 4, textAlign: 'center', fontFamily: 'inherit' }}>

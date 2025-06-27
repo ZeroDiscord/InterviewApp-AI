@@ -121,6 +121,13 @@ const interviewSessionSchema = new mongoose.Schema({
         type: [mongoose.Schema.Types.Mixed],
         default: []
     },
+    // Add decision field for admin's decision (approved/rejected)
+    decision: {
+        status: { type: String, enum: ['approved', 'rejected'], default: null },
+        comments: { type: String },
+        decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        decidedAt: { type: Date }
+    },
 }, {
     timestamps: true
 });

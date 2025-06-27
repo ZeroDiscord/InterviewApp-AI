@@ -4,6 +4,7 @@ const AppError = require('../utils/AppError');
 const InterviewSession = require('../models/interviewSession.model.js');
 const User = require('../models/user.model.js');
 const { sendInviteEmail, sendDecisionEmail } = require('../utils/mail');
+const InterviewReport = require('../models/interviewReport.model.js');
 
 
 const createSession = async (req, res) => {
@@ -123,28 +124,71 @@ const getMySessions = async (req, res) => {
     });
 };
 
+/**
+ * Get completed interview sessions with advanced filtering.
+ * @route   GET /api/interview/sessions/completed
+ * @query   status (optional) - 'approved' | 'rejected'
+ * @query   templateId (optional) - ObjectId of InterviewTemplate
+ * @query   dateFrom (optional) - ISO date string (filter sessions completed after this date)
+ * @query   dateTo (optional) - ISO date string (filter sessions completed before this date)
+ * @access  Private (Admin, Interviewer, HR Manager)
+ */
 const getCompletedSessions = async (req, res) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 5;
     const skip = (page - 1) * limit;
+    const status = req.query.status; // 'approved', 'rejected', or undefined
+    const templateId = req.query.templateId;
+    const dateFrom = req.query.dateFrom;
+    const dateTo = req.query.dateTo;
 
-    const total = await InterviewSession.countDocuments({ status: 'completed' });
-    const sessions = await InterviewSession.find({ status: 'completed' })
+    const filter = { status: 'completed' };
+    if (status === 'approved' || status === 'rejected') {
+        filter['decision.status'] = status;
+    }
+    if (templateId) {
+        filter['template'] = templateId;
+    }
+    if (dateFrom || dateTo) {
+        filter['completedAt'] = {};
+        if (dateFrom) filter['completedAt'].$gte = new Date(dateFrom);
+        if (dateTo) filter['completedAt'].$lte = new Date(dateTo);
+        // Remove completedAt if both are invalid
+        if (Object.keys(filter['completedAt']).length === 0) delete filter['completedAt'];
+    }
+
+    const total = await InterviewSession.countDocuments(filter);
+    const sessions = await InterviewSession.find(filter)
         .populate('candidate', 'firstName lastName email')
         .populate('template', 'title')
         .sort({ completedAt: -1 })
         .skip(skip)
         .limit(limit);
 
+    // Get reports for these sessions to include scores
+    const sessionIds = sessions.map(s => s._id);
+    const reports = await InterviewReport.find({ session: { $in: sessionIds } });
+    const reportMap = {};
+    reports.forEach(r => { reportMap[r.session.toString()] = r; });
+
+    // Combine session data with report data
+    const sessionsWithScores = sessions.map(session => {
+        const report = reportMap[session._id.toString()] || {};
+        return {
+            ...session.toObject(),
+            overallScore: report.overallScore || null,
+        };
+    });
+
     res.status(200).json({
         success: true,
-        count: sessions.length,
+        count: sessionsWithScores.length,
         pagination: {
             page,
             totalPages: Math.ceil(total / limit),
             totalRecords: total
         },
-        data: sessions,
+        data: sessionsWithScores,
     });
 };
 

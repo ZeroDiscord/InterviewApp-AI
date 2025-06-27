@@ -44,7 +44,7 @@ const SummaryPage = ({ reportData: report }) => {
                 }}
             >
                 <Box sx={{ textAlign: 'center', mb: 6, borderBottom: '1px solid #232526', pb: 4 }}>
-                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#fff', fontFamily: 'inherit', letterSpacing: 0.5 }}>
+                    <Typography variant="h4" sx={{ color: '#FFE066', fontWeight: 900, fontFamily: 'Inter, Roboto, Arial, sans-serif', letterSpacing: 1, textShadow: '0 2px 16px #ffe06633', mb: 4, textAlign: 'center' }}>
                         Interview Report
                     </Typography>
                     <Typography variant="h6" sx={{ color: '#bdbdbd', fontWeight: 500, fontFamily: 'inherit', textTransform: 'capitalize' }}>

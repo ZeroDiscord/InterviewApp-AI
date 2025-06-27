@@ -51,7 +51,7 @@ const processAnswer = async (userTranscription, questionDetails) => {
   const semanticDiceScoreDecimal = stringSimilarity.compareTwoStrings(userTranscription.toLowerCase(), questionDetails.idealAnswer.toLowerCase());
 
   // --- WEIGHTED AVERAGE (0-1 scale) ---
-  const weights = { keyword: 0.80, semantic: 0.20 };
+  const weights = { keyword: 0.95, semantic: 0.05 };
   const finalWeightedScoreDecimal = (aiKeywordScoreDecimal * weights.keyword) + (semanticDiceScoreDecimal * weights.semantic);
   
   // --- CONVERT ALL SCORES TO PERCENTAGES (0-100 scale) for the frontend ---
@@ -107,7 +107,7 @@ async function generateFinalReport(responses) {
     const prompt = `
         You are an expert HR analyst and technical interviewer. Your task is to provide a comprehensive and detailed evaluation of a candidate based on their interview responses.
         Analyze the provided interview data, which includes the question, the candidate's transcribed answer, the score (out of 100), and AI-generated feedback for each response.
-
+         - If it is completely irrelevant to the job description or the question, you should return a score of 0.
         Your entire response MUST be a single, valid JSON object, with no surrounding text or markdown.
         The JSON object must have the following structure and keys:
 

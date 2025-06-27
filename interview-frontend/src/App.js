@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import * as apiClient from './services/apiClient';
+import { ThemeProvider, createTheme, CssBaseline, Box, IconButton, Menu, MenuItem, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert, Typography, Button } from '@mui/material';
+import SettingsIcon from '@mui/icons-material/Settings';
+import AccountCircle from '@mui/icons-material/AccountCircle';
 
 // Import all pages
 import LoginPage from './pages/LoginPage';
@@ -14,6 +17,12 @@ import ResourceCheckPage from './pages/ResourceCheckPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ServerErrorPage from './pages/ServerErrorPage';
 import NetworkErrorPage from './pages/NetworkErrorPage';
+import DashboardLayout from './components/DashboardLayout';
+import ScheduleInterviewPage from './pages/ScheduleInterviewPage';
+import CreateUserPage from './pages/CreateUserPage';
+import TemplatesPage from './pages/TemplatesPage';
+import ReportsPage from './pages/ReportsPage';
+import SettingsPage from './pages/SettingsPage';
 
 function App() {
     const [user, setUser] = useState(null);
@@ -22,6 +31,16 @@ function App() {
     const [error, setError] = useState('');
     const [errorType, setErrorType] = useState(null); // 'network' | 'server' | null
     const [resourceCheckedFor, setResourceCheckedFor] = useState(null);
+    const [adminPath, setAdminPath] = useState('/admin/dashboard');
+    // Candidate menu/dialog state
+    const [anchorEl, setAnchorEl] = useState(null);
+    const menuOpen = Boolean(anchorEl);
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const [pwOpen, setPwOpen] = useState(false);
+    const [pwData, setPwData] = useState({ currentPassword: '', newPassword: '', confirm: '' });
+    const [pwLoading, setPwLoading] = useState(false);
+    const [pwError, setPwError] = useState('');
+    const [pwSuccess, setPwSuccess] = useState('');
 
     useEffect(() => {
         const storedUser = JSON.parse(localStorage.getItem('user'));
@@ -30,6 +49,32 @@ function App() {
         }
         setAppLoading(false);
     }, []);
+
+    const theme = useMemo(() => createTheme({
+        palette: {
+            mode: 'dark',
+            background: {
+                default: '#181818',
+                paper: '#232526',
+                sidebar: 'rgba(30,30,30,0.85)',
+            },
+            primary: { main: '#FFE066' },
+            secondary: { main: '#FFD133' },
+            accent: { main: '#FFD133', contrastText: '#181818' },
+            text: { primary: '#fff', secondary: '#bdbdbd' },
+            divider: '#FFE066',
+            custom: {
+                glow: '0 4px 32px 0 #ffe06622, 0 1.5px 8px 0 #0008',
+                shadow: '0 2px 8px 0 #0006',
+                gradient: 'linear-gradient(135deg, #232526 60%, #181818 100%)',
+                sidebarActive: 'rgba(255,224,102,0.08)',
+                sidebarHover: 'rgba(255,224,102,0.12)',
+            },
+        },
+        typography: {
+            fontFamily: 'Inter, Roboto, Arial, sans-serif',
+        },
+    }), []);
 
     // Example: catch network/server errors globally (for real app, use axios interceptors)
     useEffect(() => {
@@ -56,7 +101,11 @@ function App() {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data));
         setUser(data);
-        setPath('/dashboard');
+        if (data.role === 'candidate') {
+            setPath('/dashboard');
+        } else {
+            setPath('/admin/dashboard');
+        }
     };
 
     const handleLogout = () => {
@@ -72,7 +121,11 @@ function App() {
 
         // Redirect logged-in users from '/' to '/dashboard'
         if (user && path === '/') {
-            setPath('/dashboard');
+            if (user.role === 'candidate') {
+                setPath('/dashboard');
+            } else {
+                setPath('/admin/dashboard');
+            }
             return null;
         }
 
@@ -115,7 +168,20 @@ function App() {
         }
         
         if (path.startsWith('/admin')) {
-            return <AdminPanel onViewReport={(sessionId) => setPath(`/reports/${sessionId}`)} />;
+            return (
+                <DashboardLayout
+                    activePath={adminPath}
+                    onNavigate={setAdminPath}
+                    onLogout={handleLogout}
+                >
+                    {adminPath === '/admin/dashboard' && <AdminPanel />}
+                    {adminPath === '/admin/schedule' && <ScheduleInterviewPage />}
+                    {adminPath === '/admin/create-user' && <CreateUserPage />}
+                    {adminPath === '/admin/templates' && <TemplatesPage />}
+                    {adminPath === '/admin/reports' && <ReportsPage />}
+                    {adminPath === '/admin/settings' && <SettingsPage />}
+                </DashboardLayout>
+            );
         }
         
         if (user.role === 'candidate') {
@@ -127,31 +193,80 @@ function App() {
         return <NotFoundPage />;
     };
     
+    // Candidate menu handlers
+    const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
+    const handleMenuClose = () => setAnchorEl(null);
+    const handleDetailsOpen = () => { setDetailsOpen(true); handleMenuClose(); };
+    const handleDetailsClose = () => setDetailsOpen(false);
+    const handlePwOpen = () => { setPwData({ currentPassword: '', newPassword: '', confirm: '' }); setPwError(''); setPwSuccess(''); setPwOpen(true); handleMenuClose(); };
+    const handlePwClose = () => setPwOpen(false);
+    const handlePwChange = e => setPwData({ ...pwData, [e.target.name]: e.target.value });
+    const handlePwSave = async () => {
+        setPwLoading(true);
+        setPwError('');
+        setPwSuccess('');
+        if (!pwData.currentPassword || !pwData.newPassword || !pwData.confirm) {
+            setPwError('All fields are required.');
+            setPwLoading(false);
+            return;
+        }
+        if (pwData.newPassword !== pwData.confirm) {
+            setPwError('New passwords do not match.');
+            setPwLoading(false);
+            return;
+        }
+        try {
+            await apiClient.changePassword({ currentPassword: pwData.currentPassword, newPassword: pwData.newPassword });
+            setPwSuccess('Password changed successfully.');
+            setTimeout(() => setPwOpen(false), 1000);
+        } catch (e) {
+            setPwError(e.message || 'Failed to change password.');
+        } finally {
+            setPwLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        setAnchorEl(null);
+    }, [user, path]);
+
     // Simple error boundary for rendering errors
     try {
     return (
-            <div className="bg-slate-900 font-sans min-h-screen">
-                <header className="sticky top-0 z-10 bg-gradient-to-r from-[#0d131f]/80 via-[#111827]/80 to-[#0d131f]/80 backdrop-blur-xl shadow-2xl border-b border-yellow-500/20">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center py-4">
-                            <h1 className="text-2xl font-extrabold text-white tracking-tight cursor-pointer hover:text-yellow-400 transition duration-150" onClick={() => user && setPath('/dashboard')}>
-                          AI Interview Portal
-                        </h1>
-                        {user && (
-                                <div className="flex items-center gap-3">
-                                {user.role !== 'candidate' && (
-                                        <button onClick={() => setPath(path.startsWith('/admin') ? '/dashboard' : '/admin')} className="px-4 py-2 rounded-lg border border-yellow-400 text-yellow-300 hover:bg-yellow-400 hover:text-slate-900 shadow-sm transition duration-150">
-                                        {path.startsWith('/admin') ? 'Dashboard' : 'Admin Panel'}
-                                    </button>
-                                )}
-                                    <button onClick={handleLogout} className="px-4 py-2 rounded-lg border border-red-500 text-red-400 hover:bg-red-500 hover:text-white shadow-sm transition duration-150">
-                                  Logout
-                                </button>
-                            </div>
+        <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <div className="bg-slate-900 font-sans min-h-screen" style={{ background: theme.palette.background.default }}>
+                <header style={{ background: theme.palette.background.paper, boxShadow: '0 2px 8px 0 #0006', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 4, background: theme.palette.primary.main }} />
+                  <h1 style={{ color: theme.palette.primary.main, fontWeight: 900, fontSize: '1.6rem', letterSpacing: 1, textShadow: '0 2px 12px #ffe06633', fontFamily: 'Inter, Roboto, Arial, sans-serif', margin: 0, zIndex: 2 }}>
+                    AI Interview Portal
+                  </h1>
+                  {/* Candidate user menu (right side) */}
+                  {user && user.role === 'candidate' && (
+                    <Box sx={{ position: 'absolute', right: 24, top: 0, height: 56, display: 'flex', alignItems: 'center' }}>
+                      <IconButton color="inherit" onClick={handleMenuOpen} size="large">
+                        {user?.avatarUrl ? (
+                          <Avatar src={user.avatarUrl} alt={user.firstName} />
+                        ) : (
+                          <AccountCircle sx={{ fontSize: 32, color: theme.palette.primary.main }} />
                         )}
-                    </div>
-                </div>
-            </header>
+                      </IconButton>
+                      {anchorEl && (
+                        <Menu
+                          anchorEl={anchorEl}
+                          open={Boolean(anchorEl)}
+                          onClose={handleMenuClose}
+                          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                        >
+                          <MenuItem onClick={handleDetailsOpen}><SettingsIcon sx={{ mr: 1 }} />Account Details</MenuItem>
+                          <MenuItem onClick={handlePwOpen}>Change Password</MenuItem>
+                          <MenuItem onClick={handleLogout} sx={{ color: '#ff5252', fontWeight: 700 }}>Logout</MenuItem>
+                        </Menu>
+                      )}
+                    </Box>
+                  )}
+                </header>
                 <main>
                  {error && (
                         <div className="max-w-4xl mx-auto bg-red-900/50 border-l-4 border-red-500 text-red-200 p-4 mb-6 rounded-r-lg">
@@ -159,8 +274,70 @@ function App() {
                     </div>
                  )}
                 {renderContent()}
-            </main>
-        </div>
+                {/* Candidate dialogs (global, so they work on all candidate pages) */}
+                {user && user.role === 'candidate' && (
+                  <>
+                    {/* Account Details Dialog */}
+                    <Dialog open={detailsOpen} onClose={handleDetailsClose} maxWidth="xs" fullWidth>
+                      <DialogTitle>Account Details</DialogTitle>
+                      <DialogContent>
+                        <Typography sx={{ mb: 2 }}>Name: <b>{user.firstName} {user.lastName}</b></Typography>
+                        <Typography sx={{ mb: 2 }}>Email: <b>{user.email}</b></Typography>
+                      </DialogContent>
+                      <DialogActions>
+                        <Button onClick={handleDetailsClose}>Close</Button>
+                      </DialogActions>
+                    </Dialog>
+                    {/* Change Password Dialog */}
+                    <Dialog open={pwOpen} onClose={handlePwClose} maxWidth="xs" fullWidth>
+                      <DialogTitle>Change Password</DialogTitle>
+                      <DialogContent>
+                        {pwError && <Alert severity="error" sx={{ mb: 2 }}>{pwError}</Alert>}
+                        {pwSuccess && <Alert severity="success" sx={{ mb: 2 }}>{pwSuccess}</Alert>}
+                        <TextField
+                          margin="dense"
+                          label="Current Password"
+                          name="currentPassword"
+                          value={pwData.currentPassword}
+                          onChange={handlePwChange}
+                          fullWidth
+                          type="password"
+                          variant="outlined"
+                          autoFocus
+                        />
+                        <TextField
+                          margin="dense"
+                          label="New Password"
+                          name="newPassword"
+                          value={pwData.newPassword}
+                          onChange={handlePwChange}
+                          fullWidth
+                          type="password"
+                          variant="outlined"
+                        />
+                        <TextField
+                          margin="dense"
+                          label="Confirm New Password"
+                          name="confirm"
+                          value={pwData.confirm}
+                          onChange={handlePwChange}
+                          fullWidth
+                          type="password"
+                          variant="outlined"
+                        />
+                      </DialogContent>
+                      <DialogActions>
+                        <Button onClick={handlePwClose} disabled={pwLoading}>Cancel</Button>
+                        <Button onClick={handlePwSave} variant="contained" sx={{ bgcolor: '#4caf50', color: '#181818', fontWeight: 700 }} disabled={pwLoading}>
+                          {pwLoading ? 'Changing...' : 'Change'}
+                        </Button>
+                      </DialogActions>
+                    </Dialog>
+                  </>
+                )}
+                </main>
+            </div>
+        </ThemeProvider>
     );
     } catch (e) {
         return <ServerErrorPage />;

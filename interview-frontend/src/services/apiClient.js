@@ -63,7 +63,14 @@ export const createSession = (sessionData) => request('/interview/sessions', { m
 export const getSessionByLink = (uniqueLink) => request(`/interview/sessions/${uniqueLink}`);
 export const submitResponse = (sessionId, responseData) => request(`/interview/sessions/${sessionId}/responses`, { method: 'POST', body: JSON.stringify(responseData) });
 export const getMySessions = () => request('/interview/sessions/my-sessions');
-export const getCompletedSessions = (page = 1, limit = 5) => request(`/interview/sessions/completed?page=${page}&limit=${limit}`);
+export const getCompletedSessions = (page = 1, limit = 5, status, templateId, dateFrom, dateTo) => {
+    let url = `/interview/sessions/completed?page=${page}&limit=${limit}`;
+    if (status && status !== 'all') url += `&status=${status}`;
+    if (templateId) url += `&templateId=${templateId}`;
+    if (dateFrom) url += `&dateFrom=${encodeURIComponent(dateFrom)}`;
+    if (dateTo) url += `&dateTo=${encodeURIComponent(dateTo)}`;
+    return request(url);
+};
 
 /**
  * Fetches the full session details for an admin, including ideal answers.
@@ -99,9 +106,15 @@ export const submitDecision = (sessionId, { decision, comments }) =>
  * Handles exporting a report as either CSV or PDF and triggers a file download.
  * @param {string} sessionId - The ID of the interview session.
  * @param {'csv' | 'pdf'} type - The desired export format.
+ * @param {string} query - Optional query string for filtered export.
  */
-export const exportReport = async (sessionId, type) => {
-    const url = `${API_BASE_URL}/reports/${sessionId}/export${type === 'pdf' ? '/pdf' : ''}`;
+export const exportReport = async (sessionId, type, query = '') => {
+    let url;
+    if (sessionId === 'filtered') {
+        url = `${API_BASE_URL}/reports/export${type === 'pdf' ? '/pdf' : ''}${query}`;
+    } else {
+        url = `${API_BASE_URL}/reports/${sessionId}/export${type === 'pdf' ? '/pdf' : ''}`;
+    }
     const token = localStorage.getItem('token');
     const headers = { 'Authorization': `Bearer ${token}` };
 
@@ -129,3 +142,10 @@ export const exportReport = async (sessionId, type) => {
         throw error;
     }
 };
+
+export const getDashboardStats = () => request('/users/admin/dashboard-stats');
+export const getRecentInterviews = () => request('/users/admin/recent-interviews');
+
+export const updateProfile = (profileData) => request('/users/me', { method: 'PUT', body: JSON.stringify(profileData) });
+export const changePassword = (data) => request('/users/me/password', { method: 'PUT', body: JSON.stringify(data) });
+export const deleteAccount = () => request('/users/me', { method: 'DELETE' });

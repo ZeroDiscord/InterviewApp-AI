@@ -284,6 +284,9 @@ const DetailedReportPage = ({ sessionId, onBack }) => {
                     <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: '#fff', textAlign: 'center' }}>
                         Recruiter Actions
                     </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: '#fff', textAlign: 'center' }}>
+                        Recruitment Status: {sessionDetails?.decision?.status ? sessionDetails.decision.status.toUpperCase() : 'PENDING'}
+                    </Typography>
                     {decisionState.decisionMade ? (
                         <Alert
                             severity={decisionState.decisionMade === 'approved' ? 'success' : 'error'}
@@ -354,7 +357,7 @@ const DetailedReportPage = ({ sessionId, onBack }) => {
                             <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', mb: 2 }}>
                                 Confirm Decision: {decisionState.decisionType?.toUpperCase()}
                             </Typography>
-                            <Typography variant="body1" sx={{ mb: 2, color: 'text.secondary' }}>
+                            <Typography variant="body1" sx={{ mb: 2, color: '#FFE066' }}>
                                 Provide final feedback for the candidate. This will be shared with them.
                             </Typography>
                             <TextField
@@ -364,13 +367,21 @@ const DetailedReportPage = ({ sessionId, onBack }) => {
                                 placeholder="e.g., Excellent problem-solving skills, but we're looking for more experience in..."
                                 value={decisionState.comments}
                                 onChange={(e) => setDecisionState(prev => ({ ...prev, comments: e.target.value }))}
-                                sx={{ 
-                                    my: 2, 
-                                    textarea: { color: '#fff' }, 
-                                    '& .MuiOutlinedInput-root': { 
+                                InputProps={{
+                                    sx: {
+                                        color: '#fff',
+                                        '&::placeholder': { color: '#bdbdbd', opacity: 1 },
+                                    },
+                                }}
+                                sx={{
+                                    my: 2,
+                                    '& .MuiInputBase-input': { color: '#fff' },
+                                    '& .MuiInputBase-input::placeholder': { color: '#bdbdbd', opacity: 1 },
+                                    textarea: { color: '#fff' },
+                                    '& .MuiOutlinedInput-root': {
                                         '& fieldset': { borderColor: '#444' },
                                         '&:hover fieldset': { borderColor: '#FFE066' },
-                                    } 
+                                    },
                                 }}
                             />
                             {decisionState.submitError && <Alert severity="error" sx={{ mb: 2 }}>{decisionState.submitError}</Alert>}

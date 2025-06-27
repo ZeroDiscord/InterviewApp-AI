@@ -92,4 +92,30 @@ router.get('/:sessionId/export/pdf', protect, asyncHandler(async (req, res) => {
     await interviewService.exportReportPDF(req.params.sessionId, res);
 }));
 
+/**
+ * @desc    Export filtered interview sessions as CSV
+ * @route   GET /api/reports/export
+ * @access  Private
+ */
+router.get('/export', protect, async (req, res) => {
+    try {
+        await interviewService.exportFilteredReportsCSV(req, res);
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Export failed.' });
+    }
+});
+
+/**
+ * @desc    Export filtered interview sessions as PDF
+ * @route   GET /api/reports/export/pdf
+ * @access  Private
+ */
+router.get('/export/pdf', protect, async (req, res) => {
+    try {
+        await interviewService.exportFilteredReportsPDF(req, res);
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Export failed.' });
+    }
+});
+
 module.exports = router;

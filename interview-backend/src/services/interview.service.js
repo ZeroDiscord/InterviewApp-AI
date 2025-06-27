@@ -205,10 +205,6 @@ const submitDecision = async ({ sessionId, decision, comments, adminId }) => {
         throw new AppError(404, 'Interview session not found.');
     }
 
-    if (session.decision) {
-        throw new AppError(400, 'A decision has already been made for this session.');
-    }
-
     session.decision = {
         status: decision,
         comments: comments,
@@ -372,6 +368,98 @@ const exportReportPDF = async (sessionId, res) => {
     doc.end();
 };
 
+// Export filtered interview sessions as CSV
+const exportFilteredReportsCSV = async (req, res) => {
+    // Parse filters
+    const { status, templateId, dateFrom, dateTo } = req.query;
+    const filter = {};
+    if (status === 'approved' || status === 'rejected') filter['decision.status'] = status;
+    if (templateId) filter['template'] = templateId;
+    if (dateFrom || dateTo) {
+        filter['completedAt'] = {};
+        if (dateFrom) filter['completedAt'].$gte = new Date(dateFrom);
+        if (dateTo) filter['completedAt'].$lte = new Date(dateTo);
+        if (Object.keys(filter['completedAt']).length === 0) delete filter['completedAt'];
+    }
+    filter['status'] = 'completed';
+    // Fetch sessions
+    const sessions = await InterviewSession.find(filter)
+        .populate('candidate', 'firstName lastName email')
+        .populate('template', 'title')
+        .sort({ completedAt: -1 });
+    // Fetch reports for all sessions
+    const sessionIds = sessions.map(s => s._id);
+    const reports = await InterviewReport.find({ session: { $in: sessionIds } });
+    // Map sessionId to report
+    const reportMap = {};
+    reports.forEach(r => { reportMap[r.session.toString()] = r; });
+    // Flatten data for CSV
+    const data = sessions.map(s => {
+        const r = reportMap[s._id.toString()] || {};
+        return {
+            candidateName: `${s.candidate?.firstName || ''} ${s.candidate?.lastName || ''}`.trim(),
+            candidateEmail: s.candidate?.email || '',
+            templateTitle: s.template?.title || '',
+            overallScore: r.overallScore || '',
+            status: s.status,
+            decision: s.decision?.status || '',
+            completedAt: s.completedAt ? new Date(s.completedAt).toLocaleDateString() : '',
+        };
+    });
+    const fields = ['candidateName', 'candidateEmail', 'templateTitle', 'overallScore', 'status', 'decision', 'completedAt'];
+    const parser = new Parser({ fields });
+    const csv = parser.parse(data);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=filtered_interview_reports.csv`);
+    res.status(200).send(csv);
+};
+
+// Export filtered interview sessions as PDF
+const exportFilteredReportsPDF = async (req, res) => {
+    // Parse filters
+    const { status, templateId, dateFrom, dateTo } = req.query;
+    const filter = {};
+    if (status === 'approved' || status === 'rejected') filter['decision.status'] = status;
+    if (templateId) filter['template'] = templateId;
+    if (dateFrom || dateTo) {
+        filter['completedAt'] = {};
+        if (dateFrom) filter['completedAt'].$gte = new Date(dateFrom);
+        if (dateTo) filter['completedAt'].$lte = new Date(dateTo);
+        if (Object.keys(filter['completedAt']).length === 0) delete filter['completedAt'];
+    }
+    filter['status'] = 'completed';
+    // Fetch sessions
+    const sessions = await InterviewSession.find(filter)
+        .populate('candidate', 'firstName lastName email')
+        .populate('template', 'title')
+        .sort({ completedAt: -1 });
+    // Fetch reports for all sessions
+    const sessionIds = sessions.map(s => s._id);
+    const reports = await InterviewReport.find({ session: { $in: sessionIds } });
+    const reportMap = {};
+    reports.forEach(r => { reportMap[r.session.toString()] = r; });
+    // Create PDF
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=filtered_interview_reports.pdf`);
+    doc.pipe(res);
+    doc.fontSize(22).fillColor('#222').text('Filtered Interview Reports', { align: 'center' });
+    doc.moveDown();
+    sessions.forEach((s, idx) => {
+        const r = reportMap[s._id.toString()] || {};
+        doc.fontSize(14).fillColor('#333').text(`#${idx + 1}`);
+        doc.fontSize(13).fillColor('#444').text(`Candidate: ${s.candidate?.firstName || ''} ${s.candidate?.lastName || ''}`);
+        doc.fontSize(12).fillColor('#333').text(`Email: ${s.candidate?.email || ''}`);
+        doc.fontSize(12).fillColor('#333').text(`Template: ${s.template?.title || ''}`);
+        doc.fontSize(12).fillColor('#333').text(`Score: ${r.overallScore || ''}`);
+        doc.fontSize(12).fillColor('#333').text(`Status: ${s.status}`);
+        doc.fontSize(12).fillColor('#333').text(`Decision: ${s.decision?.status || ''}`);
+        doc.fontSize(12).fillColor('#333').text(`Completed: ${s.completedAt ? new Date(s.completedAt).toLocaleDateString() : ''}`);
+        doc.moveDown();
+    });
+    doc.end();
+};
+
 module.exports = {
     createSessionFromTemplate,
     submitResponse,
@@ -381,4 +469,6 @@ module.exports = {
     submitDecision,
     exportReportCSV,
     exportReportPDF,
+    exportFilteredReportsCSV,
+    exportFilteredReportsPDF,
 };
